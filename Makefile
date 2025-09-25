@@ -1,99 +1,88 @@
-ENV=prod
+COMPOSE_PROJECT_NAME_DEV=aichat_dev
+COMPOSE_PROJECT_NAME_PROD=aichat_prod
 
-COMPOSE_FILE = .docker/docker-compose.prod.yaml
-DEV_COMPOSE_FILE = .docker/docker-compose.dev.yaml
+COMPOSE_FILE_DEV = docker/docker-compose.dev.yaml
+COMPOSE_FILE_PROD = docker/docker-compose.prod.yaml
 ENV_FILE = .env
-DOCKER_COMPOSE = docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE)
-DEV_DOCKER_COMPOSE = docker compose -f $(DEV_COMPOSE_FILE) --env-file $(ENV_FILE)
 
--include $(ENV_FILE)
+DC_DEV=docker compose -f $(COMPOSE_FILE_DEV) -p $(COMPOSE_PROJECT_NAME_DEV) --env-file $(ENV_FILE)
+DC_PROD=docker compose -f $(COMPOSE_FILE_PROD) -p $(COMPOSE_PROJECT_NAME_PROD) --env-file $(ENV_FILE)
 
+.PHONY: help \
+dev-build dev-up dev-down dev-stop dev-restart dev-logs dev-shell \
+dev-startapp dev-makemigrations dev-migrate dev-superuser dev-static \
+prod-build prod-up prod-down prod-stop prod-restart prod-logs prod-shell \
+prod-migrate prod-superuser prod-static
 
-.PHONY: start_dev
-start_dev:
-	@echo "Start dev for $(ENV) environment..."
-	@$(DEV_DOCKER_COMPOSE) up --build
+# ====================================================================================
 
-.PHONY: dev
-dev:
-	@echo "Start dev for $(ENV) environment..."
-	@$(DEV_DOCKER_COMPOSE) up
+dev-build:
+	$(DC_DEV) build
 
-.PHONY: help
-help:
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\036m%-30s\033[0m %s\n", $$1, $$2}'
-	@echo ""
-	@echo "To use 'prod' environment, append 'ENV=prod' (e.g., make up ENV=prod)"
+dev-up:
+	$(DC_DEV) up -d
 
+dev-down:
+	$(DC_DEV) down $(args)
 
-.PHONY: build
-build:
-	@echo "Building Docker images for $(ENV) environment..."
-	@$(DOCKER_COMPOSE) build
+dev-stop:
+	$(DC_DEV) stop
 
-.PHONY: up
-up:
-	@echo "Starting Docker containers for $(ENV) environment..."
-	@$(DOCKER_COMPOSE) up -d
+dev-restart:
+	$(DC_DEV) restart $(s)
 
-.PHONY: up-logs
-up-logs:
-	@echo "Starting Docker containers with logs for $(ENV) environment..."
-	@$(DOCKER_COMPOSE) up
+dev-logs:
+	$(DC_DEV) logs -f $(s)
 
-.PHONY: logs
-logs:
-	@$(DOCKER_COMPOSE) logs -f
+dev-shell:
+	$(DC_DEV) exec $(s) sh
 
-.PHONY: down
-down:
-	@echo "Stopping and removing Docker containers for $(ENV) environment..."
-	@$(DOCKER_COMPOSE) down
+dev-startapp:
+	$(DC_DEV) exec backend python backend/manage.py startapp $(args)
 
-.PHONY: clean
-clean:
-	@echo "WARNING: This will remove ALL containers, images, and volumes for $(ENV) environment. Data will be lost."
-	@bash -c 'read -p "Are you sure? (y/N) " confirm; \
- 	if [ "$$confirm" = "y" ]; then \
-		echo "Proceeding with clean for $(ENV) environment..."; \
-  		$(DOCKER_COMPOSE) down --rmi all -v --volumes --remove-orphans; \
- 	else \
-  		echo "Clean operation cancelled."; \
-  		exit 1; \
- 	fi'
+dev-makemigrations:
+	$(DC_DEV) exec backend python backend/manage.py makemigrations $(args)
 
-.PHONY: restart
-restart:
-	@echo "Restarting Docker containers for $(ENV) environment..."
-	@$(DOCKER_COMPOSE) restart
+dev-migrate:
+	$(DC_DEV) exec backend python backend/manage.py migrate
 
+dev-superuser:
+	$(DC_DEV) exec backend python backend/manage.py createsuperuser
 
+dev-static:
+	$(DC_DEV) exec backend python backend/manage.py collectstatic --noinput
 
-.PHONY: migrate
-migrate:
-	@echo "Running migrations for $(ENV) environment..."
-	@$(DOCKER_COMPOSE) exec web python backend/manage.py migrate --noinput
+# ====================================================================================
 
-.PHONY: makemigrations
-makemigrations:
-	@$(DOCKER_COMPOSE) exec web python backend/manage.py makemigrations $(APP)
+prod-build:
+	$(DC_PROD) build
 
+prod-up:
+	$(DC_PROD) up -d
 
-.PHONY: collectstatic
-collectstatic:
-	@echo "Collecting static files for $(ENV) environment..."
-	@$(DOCKER_COMPOSE) exec app python backend/manage.py collectstatic --noinput
+prod-down:
+	$(DC_PROD) down $(args)
 
+prod-stop:
+	$(DC_PROD) stop
 
-.PHONY: base_commands
-base_commands:
-	@echo "Collecting static files for $(ENV) environment..."
-	@$(DOCKER_COMPOSE) exec web python backend/manage.py migrate --noinput
-	@$(DOCKER_COMPOSE) exec web python backend/manage.py collectstatic --noinput
-	@$(DOCKER_COMPOSE) exec web python backend/manage.py createsuperuser
+prod-restart:
+	$(DC_PROD) restart $(s)
 
+prod-logs:
+	$(DC_PROD) logs -f $(s)
 
-.PHONY: super_user
-super_user:
-	@echo "Collecting static files for $(ENV) environment..."
-	@$(DOCKER_COMPOSE) exec web python backend/manage.py createsuperuser
+prod-shell:
+	$(DC_PROD) exec $(s) sh
+
+prod-makemigrations:
+	$(DC_DEV) exec backend python backend/manage.py makemigrations $(args)
+
+prod-migrate:
+	$(DC_PROD) exec backend python backend/manage.py migrate
+
+prod-superuser:
+	$(DC_PROD) exec backend python backend/manage.py createsuperuser
+
+prod-static:
+	$(DC_PROD) exec backend python backend/manage.py collectstatic --noinput
