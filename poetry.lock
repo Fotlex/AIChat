@@ -464,6 +464,21 @@ python-crontab = ">=2.3.4"
 tzdata = "*"
 
 [[package]]
+name = "django-cors-headers"
+version = "3.14.0"
+description = "django-cors-headers is a Django application for handling the server headers required for Cross-Origin Resource Sharing (CORS)."
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "django_cors_headers-3.14.0-py3-none-any.whl", hash = "sha256:684180013cc7277bdd8702b80a3c5a4b3fcae4abb2bf134dceb9f5dfe300228e"},
+    {file = "django_cors_headers-3.14.0.tar.gz", hash = "sha256:5fbd58a6fb4119d975754b2bc090f35ec160a8373f276612c675b00e8a138739"},
+]
+
+[package.dependencies]
+Django = ">=3.2"
+
+[[package]]
 name = "django-redis"
 version = "6.0.0"
 description = "Full featured redis cache backend for Django."
@@ -1584,4 +1599,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12, <4.0"
-content-hash = "211ee28555794a1023f7e95a9a3ba5450c7d9dfd44fe3439694454d383058925"
+content-hash = "8ffdf63d144448534da94be0b5af1105cdb1a1cd5a2699361ed4b3ba66c51b63"
