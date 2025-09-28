@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import { useCharactersStore } from '@/store/characters';
-import CharacterList from '@/components/CharacterList.vue';
-import BottomNav from '@/components/BottomNav.vue';
+import { onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { useCharactersStore } from "@/store/characters";
 
 const charactersStore = useCharactersStore();
+const router = useRouter();
 
 onMounted(() => {
-  charactersStore.fetchCharacters();
+  if (charactersStore.characters.length === 0) {
+    charactersStore.fetchCharacters();
+  }
 });
 
 const handleSelectCharacter = (id: number) => {
-  charactersStore.selectCharacter(id);
+  router.push({ name: "chat", params: { id } });
 };
 
 const handleToggleFavorite = (id: number) => {
@@ -24,11 +26,11 @@ const handleToggleFavorite = (id: number) => {
     <div v-if="charactersStore.isLoading" class="status-message">
       Загрузка персонажей...
     </div>
-    
+
     <div v-else-if="charactersStore.error" class="status-message error">
       Ошибка: {{ charactersStore.error }}
     </div>
-    
+
     <CharacterList
       v-else-if="charactersStore.characters.length > 0"
       :characters="charactersStore.characters"
@@ -36,29 +38,32 @@ const handleToggleFavorite = (id: number) => {
       @toggle-favorite="handleToggleFavorite"
     />
 
-    <div v-else class="status-message">
-      Персонажи не найдены.
-    </div>
-    
-    <BottomNav />
+    <div v-else class="status-message">Персонажи не найдены.</div>
   </div>
 </template>
 
 <style scoped>
 .view-container {
-  min-height: 100vh;
   width: 100%;
-  background: linear-gradient(160deg, #4c2a4e 0%, #2c2c40 100%);
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 .status-message {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 80vh;
+  flex-grow: 1;
   color: white;
   font-size: 18px;
+  padding: 20px;
+  text-align: center;
 }
 .status-message.error {
   color: #ff8a8a;
+}
+
+.view-container > :deep(.character-list-component-class) {
+  flex-shrink: 0;
 }
 </style>

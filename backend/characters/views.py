@@ -2,6 +2,7 @@ from rest_framework.generics import ListAPIView
 from .models import Character
 from .serializers import CharacterListSerializer
 
+
 class CharacterListView(ListAPIView):
     serializer_class = CharacterListSerializer
 

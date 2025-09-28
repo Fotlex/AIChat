@@ -11,6 +11,8 @@ DEBUG = config.DEBUG
 ALLOWED_HOSTS = config.ALLOWED_HOSTS
 CSRF_TRUSTED_ORIGINS = config.CSRF_TRUSTED_ORIGINS
 
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 INSTALLED_APPS = [
     "backend.core.admin_apps.MyAdminConfig",
     "django.contrib.auth",
