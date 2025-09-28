@@ -3,6 +3,9 @@ import { onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useCharactersStore } from "@/store/characters";
 
+import CharacterList from "@/components/CharacterList.vue"; 
+import GenderFilter from "@/components/GenderFilter.vue";
+
 const charactersStore = useCharactersStore();
 const router = useRouter();
 
@@ -23,6 +26,8 @@ const handleToggleFavorite = (id: number) => {
 
 <template>
   <div class="view-container">
+    <GenderFilter />
+
     <div v-if="charactersStore.isLoading" class="status-message">
       Загрузка персонажей...
     </div>
@@ -32,8 +37,8 @@ const handleToggleFavorite = (id: number) => {
     </div>
 
     <CharacterList
-      v-else-if="charactersStore.characters.length > 0"
-      :characters="charactersStore.characters"
+      v-else-if="charactersStore.filteredCharacters.length > 0"
+      :characters="charactersStore.filteredCharacters" 
       @select-character="handleSelectCharacter"
       @toggle-favorite="handleToggleFavorite"
     />
@@ -61,9 +66,5 @@ const handleToggleFavorite = (id: number) => {
 }
 .status-message.error {
   color: #ff8a8a;
-}
-
-.view-container > :deep(.character-list-component-class) {
-  flex-shrink: 0;
 }
 </style>

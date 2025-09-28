@@ -1,4 +1,5 @@
 from pathlib import Path
+from telegram_webapp_auth.auth import generate_secret_key
 
 from .config import config
 
@@ -38,6 +39,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    
+    "backend.users.middlewares.TWAAuthorizationMiddleware",
 ]
 
 ROOT_URLCONF = "backend.core.urls"
@@ -101,6 +104,8 @@ MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+TELEGRAM_SECRET_KEY = generate_secret_key(config.BOT_TOKEN)
 
 REDIS_HOST = config.REDIS_HOST
 REDIS_PORT = config.REDIS_PORT

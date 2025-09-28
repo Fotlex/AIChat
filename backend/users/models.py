@@ -25,7 +25,7 @@ class User(models.Model):
     updated_at = models.DateTimeField("Дата обновления", auto_now=True)
 
     def __str__(self):
-        return f"id: {self.id} | @{self.username or '-'}"
+        return f"id: {self.telegram_id} | @{self.username or '-'}"
 
     class Meta:
         verbose_name = "Пользователь"

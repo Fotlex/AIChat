@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { useUserStore } from "@/store/user";
 
 defineProps<{
@@ -6,6 +7,9 @@ defineProps<{
 }>();
 
 const userStore = useUserStore();
+onMounted(() => {
+  userStore.fetchUser();
+});
 </script>
 
 <template>

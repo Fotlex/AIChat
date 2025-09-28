@@ -20,9 +20,7 @@ const isFavorite = false;
         <p class="card-description">{{ character.description }}</p>
       </div>
       <div class="card-actions">
-        <button class="icon-button" @click.stop="emit('select', character.id)">
-          <i-local-chat />
-        </button>
+        
         <button
           class="icon-button"
           @click.stop="emit('favorite', character.id)"
@@ -34,11 +32,13 @@ const isFavorite = false;
   </div>
 </template>
 
+    
 <style scoped>
 .icon-button .active {
   fill: #ff4d4d;
   stroke: #ff4d4d;
 }
+
 .card {
   position: relative;
   border-radius: 20px;
@@ -52,9 +52,11 @@ const isFavorite = false;
   transition: transform 0.2s ease-in-out;
   background-color: #333;
 }
+
 .card:hover {
   transform: scale(1.03);
 }
+
 .card-image {
   position: absolute;
   top: 0;
@@ -64,6 +66,7 @@ const isFavorite = false;
   object-fit: cover;
   z-index: 1;
 }
+
 .card-overlay {
   position: relative;
   z-index: 2;
@@ -74,25 +77,37 @@ const isFavorite = false;
     rgba(0, 0, 0, 0) 0%,
     rgba(0, 0, 0, 0.7) 100%
   );
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
   min-height: 120px;
 }
+
+.card-info {
+  padding-right: 52px;
+}
+
 .card-name {
   font-size: 24px;
   font-weight: bold;
   margin: 0 0 4px;
+  overflow-wrap: break-word;
 }
+
 .card-description {
   font-size: 14px;
   margin: 0;
   opacity: 0.9;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
 .card-actions {
-  display: flex;
-  gap: 8px;
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
 }
+
 .icon-button {
   background: rgba(255, 255, 255, 0.2);
   border: none;

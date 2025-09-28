@@ -8,6 +8,8 @@ class CharacterListSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'name',
+            'gender',
+            'creator',
             'description',
             'photo',
         ]

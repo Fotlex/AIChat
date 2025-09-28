@@ -6,7 +6,7 @@ from .models import Character
 
 @admin.register(Character)
 class CharacterAdmin(admin.ModelAdmin):
-    list_display = ("name", "gender", "is_active", "display_photo")
+    list_display = ("name", "gender", "is_active", "creator", "display_photo")
     list_filter = ("gender", "is_active")
     search_fields = ("name", "description")
     list_editable = ("is_active",)

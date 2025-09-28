@@ -1,6 +1,8 @@
-from django.urls import path
-from .views import CharacterListView
+from rest_framework.routers import DefaultRouter
+from .views import CharacterViewSet
 
-urlpatterns = [
-    path('', CharacterListView.as_view(), name='character-list'),
-]
+router = DefaultRouter()
+
+router.register(r'characters', CharacterViewSet, basename='character')
+
+urlpatterns = router.urls

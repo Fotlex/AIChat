@@ -43,6 +43,15 @@ class Character(models.Model):
         help_text="Первое сообщение, которое персонаж отправит в новом чате.",
     )
 
+    creator = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        related_name='characters',
+        verbose_name="Создатель",
+        null=True,
+        blank=True,
+    )
+    
     is_active = models.BooleanField(
         "Активен",
         default=True,
