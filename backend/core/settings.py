@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "backend.characters.apps.CharactersConfig",
     "backend.chats.apps.ChatsConfig",
     "backend.content.apps.ContentConfig",
+    "backend.payments.apps.PaymentsConfig",
 ]
 
 MIDDLEWARE = [

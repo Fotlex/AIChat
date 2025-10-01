@@ -14,7 +14,6 @@ declare module 'vue' {
     CharacterList: typeof import('./src/components/CharacterList.vue')['default']
     DefaultLayout: typeof import('./src/layouts/DefaultLayout.vue')['default']
     GenderFilter: typeof import('./src/components/GenderFilter.vue')['default']
-    ILocalChat: typeof import('~icons/local/chat')['default']
     ILocalCrystal: typeof import('~icons/local/crystal')['default']
     ILocalHeart: typeof import('~icons/local/heart')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
