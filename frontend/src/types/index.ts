@@ -14,3 +14,11 @@ export interface User {
   last_name: string | null;
   balance: number;
 }
+
+export interface Tariff {
+  id: number; 
+  name: string;
+  cost: number;
+  reward: number;
+  photo: string | null;
+}

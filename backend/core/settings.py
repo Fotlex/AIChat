@@ -134,6 +134,7 @@ ADMIN_REORDER = [
     {"app": "users", "label": "Пользователи"},
     {"app": "characters", "label": "Персонажи"},
     {"app": "chats", "label": "Чаты"},
+    {"app": "payments", "label": "Платежи"},
     {"app": "content", "label": "Контент и Настройки"},
     {"app": "django_celery_beat", "label": "Планировщик задач (Celery Beat)"},
 ]

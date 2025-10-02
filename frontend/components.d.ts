@@ -18,6 +18,7 @@ declare module 'vue' {
     ILocalHeart: typeof import('~icons/local/heart')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TariffCard: typeof import('./src/components/TariffCard.vue')['default']
     TopNav: typeof import('./src/components/TopNav.vue')['default']
   }
 }
