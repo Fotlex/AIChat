@@ -24,6 +24,10 @@ class User(models.Model):
     created_at = models.DateTimeField("Дата регистрации", auto_now_add=True, blank=True)
     updated_at = models.DateTimeField("Дата обновления", auto_now=True)
 
+    @property
+    def is_authenticated(self):
+        return True
+
     def __str__(self):
         return f"id: {self.telegram_id} | @{self.username or '-'}"
 

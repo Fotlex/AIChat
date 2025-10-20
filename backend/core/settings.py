@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from telegram_webapp_auth.auth import generate_secret_key
 
 from .config import config
@@ -23,7 +24,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "django_celery_beat",
-    "corsheaders",
     "backend.users.apps.UsersConfig",
     "backend.characters.apps.CharactersConfig",
     "backend.chats.apps.ChatsConfig",
@@ -34,14 +34,11 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    
-    "backend.users.middlewares.TWAAuthorizationMiddleware",
 ]
 
 ROOT_URLCONF = "backend.core.urls"
@@ -89,6 +86,15 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "backend.users.authentication.TWAAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
 
 LANGUAGE_CODE = "ru"
 

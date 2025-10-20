@@ -41,8 +41,8 @@ export default defineConfig(({ mode }) => {
       host: "0.0.0.0",
       port: 5173,
       hmr: {
-        port: 80,
-        protocol: "ws",
+        protocol: 'wss',
+        host: env.VITE_ALLOWED_HOSTS?.split(",")[0] || "localhost",
       },
       watch: {
         usePolling: true,

@@ -1,18 +1,17 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.response import Response
 
-from .serializers import UserSerializer
 from .models import User
+from .serializers import UserSerializer
 
 
-class UserViewSet(viewsets.ViewSet):
+class UserViewSet(viewsets.GenericViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    
-    @action(detail=False, methods=['get'])
+
+    @action(detail=False, methods=["get"], url_path="me")
     def current_user(self, request):
-        user = request.tg_user
-        serializer = UserSerializer(user)
+        user = request.user
+        serializer = self.get_serializer(user)
         return Response(serializer.data)

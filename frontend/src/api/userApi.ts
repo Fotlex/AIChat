@@ -1,6 +1,7 @@
-import apiClient from './apiClient';
+import apiClient from "./apiClient";
+import type { User } from "@/types";
 
-export const getUser = async () => {
-    const response = await apiClient.get('/users/current_user/');
-    return response.data;
-  };
+export const getUser = async (): Promise<User> => {
+  const response = await apiClient.get<User>("/users/me/");
+  return response.data;
+};
