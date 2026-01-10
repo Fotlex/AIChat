@@ -11,7 +11,9 @@ class User(models.Model):
     last_name = models.CharField("Фамилия", max_length=255, null=True, blank=True)
 
     balance = models.PositiveIntegerField("Баланс", default=0)
-
+    total_paid = models.PositiveIntegerField(verbose_name='Всего оплачено (RUB)', default=0)
+    refferal_balance = models.IntegerField(default=0, verbose_name='Реферальный баланс')
+    
     referrer = models.ForeignKey(
         "self",
         on_delete=models.SET_NULL,

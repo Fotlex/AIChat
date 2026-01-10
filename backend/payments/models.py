@@ -24,5 +24,42 @@ class Tariff(models.Model):
     class Meta:
         verbose_name = "Тариф"
         verbose_name_plural = "Тарифы"
+        
+        
+class Payment(models.Model):
+    STATUS = (
+        ('pending', 'Ожидание'),
+        ('canceled', 'Отменен'),
+        ('succeeded', 'Успешный')
+    )
+    payment_id = models.CharField(
+        max_length=36,  
+        unique=True,    
+        verbose_name="ID платежа в ЮKassa"
+    )
+    user = models.ForeignKey(
+        'users.User',
+        on_delete=models.CASCADE,
+        related_name="payments",
+        verbose_name="Пользователь",
+    )
+    
+    tariff = models.ForeignKey(
+        Tariff,
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name="Тариф",
+    )
+    
+    status = models.CharField(choices=STATUS, default='pending', verbose_name='Статус платежа')
+    create_at = models.DateTimeField(auto_created=True, verbose_name='Дата создания платежа')
+    
+    def __str__(self):
+        return f"Пользователь {self.user.id}"
+    
+    
+    class Meta:
+        verbose_name = "Платеж"
+        verbose_name_plural = "Платежи"
     
     
