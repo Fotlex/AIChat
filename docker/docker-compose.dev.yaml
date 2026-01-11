@@ -1,9 +1,9 @@
 services:
   db:
     image: postgres:17-alpine
-    container_name: aichat_db
+    container_name: aichat-db
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
+      - postgres-data:/var/lib/postgresql/data/
     env_file:
       - ../.env
     healthcheck:
@@ -11,14 +11,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-      start_period: 10s
 
   redis:
     image: redis:7-alpine
-    container_name: aichat_redis
+    container_name: aichat-redis
     command: redis-server --appendonly yes
     volumes:
-      - redis_data:/data
+      - redis-data:/data
     env_file:
       - ../.env
     healthcheck:
@@ -26,95 +25,97 @@ services:
       interval: 1s
       timeout: 3s
       retries: 5
-      start_period: 5s
+
+  centrifugo:
+    image: centrifugo/centrifugo:v6.6.0
+    container_name: aichat-centrifugo
+    volumes:
+      - ./centrifugo/config.json:/centrifugo/config.json
+    command: centrifugo -c /centrifugo/config.json
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    environment:
+      - CENTRIFUGO_HTTP_API_KEY=${CENTRIFUGO_API_KEY}
+      - CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY=${CENTRIFUGO_HMAC_SECRET}
+      - CENTRIFUGO_CLIENT_ALLOWED_ORIGINS=${CENTRIFUGO_ORIGINS}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "centrifugo", "check"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
-      context: ..
-      dockerfile: docker/dockerfiles/python/dev.Dockerfile
-    container_name: aichat_backend
-    command: python backend/manage.py runserver 0.0.0.0:8000
+      context: ../backend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: aichat-backend
+    command: python manage.py runserver 0.0.0.0:8000
     volumes:
-      - ../:/app
-      - static_volume:/app/backend/static_root
-      - media_volume:/app/backend/media
+      - ../backend:/app
+      - static-volume:/app/static_root
+      - media-volume:/app/media
     expose:
       - 8000
     env_file:
       - ../.env
-    environment:
-      - PYTHONPATH=/app
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
 
-  bot:
+  celery-worker:
     build:
-      context: ..
-      dockerfile: docker/dockerfiles/python/dev.Dockerfile
-    container_name: aichat_bot
-    command: python bot/main.py
+      context: ../backend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: aichat-celery-worker
+    command: celery -A config worker -l INFO -P gevent -c 100
     volumes:
-      - ../:/app
-      - media_volume:/app/backend/media
+      - ../backend:/app
+      - media-volume:/app/media
     env_file:
       - ../.env
     environment:
-      - PYTHONPATH=/app
+      - CELERY_POOL_CLASS=gevent
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
 
-  celery_worker:
+  celery-beat:
     build:
-      context: ..
-      dockerfile: docker/dockerfiles/python/dev.Dockerfile
-    container_name: aichat_celery_worker
-    command: celery -A backend.core worker -l INFO
+      context: ../backend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: aichat-celery-beat
+    command: celery -A config beat -l INFO
     volumes:
-      - ../:/app
-      - media_volume:/app/backend/media
+      - ../backend:/app
     env_file:
       - ../.env
-    environment:
-      - PYTHONPATH=/app
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
 
-  celery_beat:
-    build:
-      context: ..
-      dockerfile: docker/dockerfiles/python/dev.Dockerfile
-    container_name: aichat_celery_beat
-    command: celery -A backend.core beat -l INFO
-    volumes:
-      - ../:/app
-    env_file:
-      - ../.env
-    environment:
-      - PYTHONPATH=/app
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-  
   frontend:
     build:
-      context: ..
-      dockerfile: docker/dockerfiles/node/dev.Dockerfile
-    container_name: aichat_frontend
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: aichat-frontend
     command: sh -c "npm install && npm run dev -- --host"
     volumes:
       - ../frontend:/app
-      - node_modules:/app/node_modules
+      - node-modules:/app/node_modules
     expose:
       - 5173
     env_file:
@@ -123,21 +124,22 @@ services:
       - backend
     stdin_open: true
     tty: true
-  
+
   nginx:
     image: nginx:1.27.5-alpine
-    container_name: aichat_nginx
+    container_name: aichat-nginx
     ports:
       - "80:80"
     volumes:
       - ./nginx/dev.conf:/etc/nginx/templates/default.conf.template:ro
-      - static_volume:/app/backend/static_root:ro
-      - media_volume:/app/backend/media:ro
+      - static-volume:/app/backend/static_root:ro
+      - media-volume:/app/backend/media:ro
     env_file: ../.env
     environment:
       NGINX_PORT: 80
       BACKEND_PORT: 8000
       FRONTEND_PORT: 5173
+      CENTRIFUGO_PORT: 8000
       ALLOWED_HOSTS: ${ALLOWED_HOSTS}
     depends_on:
       backend:
@@ -146,8 +148,8 @@ services:
         condition: service_started
 
 volumes:
-  postgres_data:
-  redis_data:
-  static_volume:
-  media_volume:
-  node_modules:
+  postgres-data:
+  redis-data:
+  static-volume:
+  media-volume:
+  node-modules:

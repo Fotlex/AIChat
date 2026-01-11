@@ -1,0 +1,37 @@
+{
+  "engine": {
+    "type": "redis",
+    "redis": {
+      "address": "redis:6379",
+      "db": 4
+    }
+  },
+  "http_api": {
+    "disabled": false
+  },
+  "admin": {
+    "enabled": false
+  },
+  "client": {
+    "ping_interval": "25s",
+    "user_connection_limit": 5,
+    "connection_rate_limit": 10,
+    "subscribe_to_user_personal_channel": {
+      "enabled": true,
+      "personal_channel_namespace": "personal"
+    }
+  },
+  "channel": {
+    "namespaces": [
+      {
+        "name": "personal",
+        "allow_publish_for_client": false,
+        "allow_subscribe_for_client": false,
+        "presence": false,
+        "history_size": 1,
+        "history_ttl": "300s",
+        "force_recovery": true
+      }
+    ]
+  }
+}

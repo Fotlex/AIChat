@@ -4,12 +4,14 @@ import { useRoute, useRouter } from "vue-router";
 import WebApp from "@twa-dev/sdk";
 import { useChatsStore } from "@/store/chats";
 import { useUserStore } from "@/store/user";
+import { useSocketStore } from "@/store/socket";
 import ChatHeader from "@/components/ChatHeader.vue";
 
 const route = useRoute();
 const router = useRouter();
 const chatsStore = useChatsStore();
 const userStore = useUserStore();
+const socketStore = useSocketStore();
 
 const messageInput = ref("");
 const messagesContainer = ref<HTMLElement | null>(null);
@@ -63,13 +65,16 @@ const scrollToBottom = async (behavior: "smooth" | "auto" = "auto") => {
   }
 };
 
-onMounted(() => {
-  chatsStore.loadChat(characterId);
+onMounted(async () => {
+  WebApp.expand();
+
   if (!userStore.currentUser) {
     userStore.fetchUser();
   }
 
-  WebApp.expand();
+  socketStore.connect();
+
+  await chatsStore.loadChat(characterId);
 
   if (chatLayout.value) {
     chatLayout.value.style.setProperty(
@@ -105,11 +110,12 @@ const adjustTextareaHeight = () => {
   }
 };
 
-const sendMessage = () => {
+const sendMessage = async () => {
   if (isSendButtonDisabled.value) return;
 
-  chatsStore.sendUserMessage(messageInput.value);
+  const content = messageInput.value;
   messageInput.value = "";
+  await chatsStore.sendUserMessage(content);
 
   nextTick(() => {
     adjustTextareaHeight();

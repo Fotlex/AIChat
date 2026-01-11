@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { getChats, getOrCreateChatWithMessages, getMessagesByUrl } from "@/api";
 import type { Chat, Message } from "@/types";
+import apiClient from "@/api/apiClient";
 import { useCharactersStore } from "./characters";
 
 export const useChatsStore = defineStore("chats", () => {
@@ -10,6 +11,7 @@ export const useChatsStore = defineStore("chats", () => {
   const currentChatDetails = ref<Chat | null>(null);
   const isLoading = ref(false);
   const isLoadingMore = ref(false);
+  const isSending = ref(false);
   const error = ref<string | null>(null);
   const nextMessagesUrl = ref<string | null>(null);
 
@@ -75,27 +77,41 @@ export const useChatsStore = defineStore("chats", () => {
     }
   }
 
-  function sendUserMessage(content: string) {
-    if (!content.trim()) return;
+  function handleIncomingMessage(payload: {
+    chat_id: number;
+    message: Message;
+  }) {
+    console.log("ChatsStore: handling message", payload);
+    if (
+      currentChatDetails.value &&
+      currentChatDetails.value.id === payload.chat_id
+    ) {
+      currentChatMessages.value.push(payload.message);
+    }
 
-    const userMessage: Message = {
-      id: Date.now(),
-      role: "user",
-      content: content,
-      created_at: new Date().toISOString(),
-    };
-    currentChatMessages.value.push(userMessage);
+    const chatInList = chatsList.value.find((c) => c.id === payload.chat_id);
+    if (chatInList) {
+      chatInList.last_message = payload.message;
+    }
+  }
 
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: Date.now() + 1,
-        role: "assistant",
-        content:
-          "Это автоматический ответ-заглушка. Настоящая логика будет позже.",
-        created_at: new Date().toISOString(),
-      };
-      currentChatMessages.value.push(aiMessage);
-    }, 1500);
+  async function sendUserMessage(content: string) {
+    if (!content.trim() || !currentChatDetails.value) return;
+
+    isSending.value = true;
+
+    try {
+      const response = await apiClient.post<Message>(
+        `/chats/${currentChatDetails.value.id}/send_message/`,
+        { content }
+      );
+
+      currentChatMessages.value.push(response.data);
+    } catch (e) {
+      console.error("Send error", e);
+    } finally {
+      isSending.value = false;
+    }
   }
 
   return {
@@ -105,11 +121,13 @@ export const useChatsStore = defineStore("chats", () => {
     currentCharacter,
     isLoading,
     isLoadingMore,
+    isSending,
     error,
     hasMoreMessages,
     fetchChatsList,
     loadChat,
     loadMoreMessages,
+    handleIncomingMessage,
     sendUserMessage,
   };
 });
