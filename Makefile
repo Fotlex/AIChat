@@ -39,6 +39,9 @@ dev-makemigrations:
 dev-migrate:
 	$(MANAGE_DEV) migrate
 
+dev-webhook:
+	$(MANAGE_DEV) set_webhook
+
 dev-superuser:
 	$(MANAGE_DEV) createsuperuser
 

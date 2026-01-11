@@ -55,7 +55,7 @@ services:
       dockerfile: Dockerfile
       target: dev
     container_name: aichat-backend
-    command: python manage.py runserver 0.0.0.0:8000
+    command: uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload --lifespan off
     volumes:
       - ../backend:/app
       - static-volume:/app/static_root
