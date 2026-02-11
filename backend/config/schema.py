@@ -1,12 +1,14 @@
-from pydantic import RedisDsn, computed_field
+from typing import Any
+
+from pydantic import RedisDsn, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     DJANGO_SECRET_KEY: str
     DEBUG: bool = False
-    ALLOWED_HOSTS: list[str]
-    CSRF_TRUSTED_ORIGINS: list[str]
+    ALLOWED_HOSTS: str | list[str]
+    CSRF_TRUSTED_ORIGINS: str | list[str]
     TIMEZONE: str
 
     POSTGRES_USER: str
@@ -30,9 +32,16 @@ class Settings(BaseSettings):
     CENTRIFUGO_API_KEY: str
     CENTRIFUGO_HMAC_SECRET: str
 
-    ADMIN_SITE_HEADER: str
-    ADMIN_SITE_TITLE: str
-    ADMIN_INDEX_TITLE: str
+    ADMIN_SITE_HEADER: str = "AIChat Admin"
+    ADMIN_SITE_TITLE: str = "Панель управления"
+    ADMIN_INDEX_TITLE: str = "Добро пожаловать"
+
+    @field_validator("ALLOWED_HOSTS", "CSRF_TRUSTED_ORIGINS", mode="before")
+    @classmethod
+    def parse_env_list(cls, v: Any) -> list[str]:
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return v
 
     @computed_field
     @property

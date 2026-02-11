@@ -64,10 +64,13 @@ DATABASES = {
         "NAME": conf.POSTGRES_DB,
         "USER": conf.POSTGRES_USER,
         "PASSWORD": conf.POSTGRES_PASSWORD,
-        "HOST": conf.POSTGRES_HOST,
-        "PORT": conf.POSTGRES_PORT,
-        "CONN_MAX_AGE": 60,
-        "CONN_HEALTH_CHECKS": True,
+        "HOST": "pgbouncer",
+        "PORT": 6432,
+        "CONN_MAX_AGE": 0,
+        "OPTIONS": {
+            "connect_timeout": 5,
+        },
+        "DISABLE_SERVER_SIDE_CURSORS": True,
     }
 }
 AUTH_PASSWORD_VALIDATORS = [
