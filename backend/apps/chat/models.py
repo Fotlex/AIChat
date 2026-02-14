@@ -17,6 +17,8 @@ class Chat(models.Model):
         related_name="chats",
         verbose_name="Персонаж",
     )
+    last_message_text = models.TextField(blank=True, null=True)
+    last_message_at = models.DateTimeField(auto_now_add=True, db_index=True)
     created_at = models.DateTimeField("Дата создания", auto_now_add=True)
 
     def __str__(self):
@@ -26,7 +28,6 @@ class Chat(models.Model):
         verbose_name = "Чат"
         verbose_name_plural = "Чаты"
         unique_together = ("user", "character")
-        ordering = ["-created_at"]
 
 
 class Message(models.Model):
@@ -40,7 +41,7 @@ class Message(models.Model):
     )
     role = models.CharField("Роль", max_length=10, choices=Role.choices)
     content = models.TextField("Содержание")
-    created_at = models.DateTimeField("Время отправки", auto_now_add=True)
+    created_at = models.DateTimeField("Время", auto_now_add=True)
 
     def __str__(self):
         return f"Сообщение от {self.get_role_display()} в {self.chat_id}"
@@ -48,4 +49,3 @@ class Message(models.Model):
     class Meta:
         verbose_name = "Сообщение"
         verbose_name_plural = "Сообщения"
-        ordering = ["created_at"]

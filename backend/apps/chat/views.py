@@ -1,110 +1,151 @@
+import orjson
 from django.db import transaction
-from django.db.models import OuterRef, Subquery
-from rest_framework import status, viewsets
-from rest_framework.decorators import action
-from rest_framework.generics import get_object_or_404
+from django.http import HttpResponse
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-
-from apps.characters.models import Character
+from rest_framework.views import APIView
 
 from .models import Chat, Message
-from .pagination import MessageCursorPagination
-from .serializers import (
-    ChatDetailSerializer,
-    ChatListSerializer,
-    MessageSerializer,
-)
 from .tasks import generate_ai_response_task
 
 
-class ChatViewSet(viewsets.ReadOnlyModelViewSet):
+class ChatListView(APIView):
     permission_classes = [IsAuthenticated]
-    pagination_class = MessageCursorPagination
 
-    def get_queryset(self):
-        user = self.request.user
-        if self.action == "list":
-            newest_msg = Message.objects.filter(chat=OuterRef("pk")).order_by(
-                "-created_at"
+    def get(self, request):
+        chats = list(
+            Chat.objects.filter(user_id=request.user.telegram_id).values(
+                "id",
+                "last_message_text",
+                "last_message_at",
+                "character_id",
+                "character__name",
+                "character__photo",
+                "character__description",
+            )
+        )
+        return HttpResponse(orjson.dumps(chats), content_type="application/json")
+
+
+class ChatDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, chat_id):
+        cursor = request.query_params.get("cursor")
+        limit = 30
+
+        if not Chat.objects.filter(
+            id=chat_id, user_id=request.user.telegram_id
+        ).exists():
+            return HttpResponse(
+                orjson.dumps({"error": "Chat not found"}),
+                status=status.HTTP_404_NOT_FOUND,
+                content_type="application/json",
             )
 
-            return (
-                Chat.objects.filter(user=user)
-                .select_related("character")
-                .annotate(
-                    last_message_content=Subquery(newest_msg.values("content")[:1]),
-                    last_message_role=Subquery(newest_msg.values("role")[:1]),
-                    last_message_created_at=Subquery(
-                        newest_msg.values("created_at")[:1]
-                    ),
-                )
-                .order_by("-created_at")
+        query = Message.objects.filter(chat_id=chat_id)
+        if cursor:
+            query = query.filter(id__lt=int(cursor))
+
+        messages = list(
+            query.order_by("-id")[: limit + 1].values(
+                "id", "role", "content", "created_at"
             )
-        return Chat.objects.filter(user=user)
+        )
 
-    def get_serializer_class(self):
-        if self.action == "list":
-            return ChatListSerializer
-        if self.action in ["messages", "get_or_create_chat", "send_message"]:
-            return MessageSerializer
-        return ChatDetailSerializer
+        has_more = len(messages) > limit
+        next_cursor = None
 
-    @action(
-        detail=False, methods=["get"], url_path="character/(?P<character_id>[^/.]+)"
-    )
-    def get_or_create_chat(self, request, character_id=None):
-        character = get_object_or_404(Character, pk=character_id)
+        if has_more:
+            messages.pop()
+            next_cursor = messages[-1]["id"]
+
+        messages.reverse()
+
+        return HttpResponse(
+            orjson.dumps(
+                {
+                    "messages": messages,
+                    "has_more": has_more,
+                    "next_cursor": next_cursor,
+                }
+            ),
+            content_type="application/json",
+        )
+
+
+class MessageSendView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, character_id):
+        content = request.data.get("content")
+        if not content or not isinstance(content, str):
+            return HttpResponse(
+                orjson.dumps({"error": "Content required"}),
+                status=status.HTTP_400_BAD_REQUEST,
+                content_type="application/json",
+            )
+
+        content = content.strip()[:1000]
+        user_id = request.user.telegram_id
+
+        chat_id = (
+            Chat.objects.filter(user_id=user_id, character_id=character_id)
+            .values_list("id", flat=True)
+            .first()
+        )
 
         with transaction.atomic():
-            chat, created = Chat.objects.get_or_create(
-                user=request.user, character=character
-            )
-            if created and character.welcome_message:
-                Message.objects.create(
-                    chat=chat,
-                    role=Message.Role.ASSISTANT,
-                    content=character.welcome_message,
+            if chat_id:
+                last_msg = Message.objects.create(
+                    chat_id=chat_id, role=Message.Role.USER, content=content
                 )
+            else:
+                chat, created = Chat.objects.get_or_create(
+                    user_id=user_id, character_id=character_id
+                )
+                chat_id = chat.id
 
-        messages_queryset = chat.messages.all().order_by("-created_at")
-        paginated_messages = self.paginate_queryset(messages_queryset)
-        messages_serializer = self.get_serializer(paginated_messages, many=True)
+                if not created:
+                    last_msg = Message.objects.create(
+                        chat_id=chat_id, role=Message.Role.USER, content=content
+                    )
+                else:
+                    from apps.characters.models import Character
 
-        chat_serializer = ChatDetailSerializer(chat)
+                    char_data = (
+                        Character.objects.filter(id=character_id)
+                        .values("welcome_message")
+                        .first()
+                    )
 
-        paginated_response = self.get_paginated_response(messages_serializer.data)
-        paginated_response.data["chat"] = chat_serializer.data
-        return paginated_response
+                    messages_to_create = []
+                    if char_data and char_data["welcome_message"]:
+                        messages_to_create.append(
+                            Message(
+                                chat=chat,
+                                role=Message.Role.ASSISTANT,
+                                content=char_data["welcome_message"],
+                            )
+                        )
 
-    @action(detail=True, methods=["get"])
-    def messages(self, request, pk=None):
-        chat = self.get_object()
-        queryset = chat.messages.all().order_by("-created_at")
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+                    messages_to_create.append(
+                        Message(chat=chat, role=Message.Role.USER, content=content)
+                    )
 
-    @action(detail=True, methods=["post"])
-    def send_message(self, request, pk=None):
-        chat = self.get_object()
-        content = request.data.get("content", "").strip()
-        if not content:
-            return Response({"error": "Content required"}, status=400)
+                    created_msgs = Message.objects.bulk_create(messages_to_create)
+                    last_msg = created_msgs[-1]
 
-        with transaction.atomic():
-            user_message = Message.objects.create(
-                chat=chat, role=Message.Role.USER, content=content
+            Chat.objects.filter(id=chat_id).update(
+                last_message_text=content, last_message_at=last_msg.created_at
             )
+
             transaction.on_commit(
-                lambda: generate_ai_response_task.delay(
-                    chat_id=chat.id, user_telegram_id=request.user.telegram_id
-                )
+                lambda: generate_ai_response_task.delay(chat_id, user_id)
             )
 
-        return Response(
-            MessageSerializer(user_message).data, status=status.HTTP_201_CREATED
+        return HttpResponse(
+            orjson.dumps({"id": last_msg.id, "chat_id": chat_id}),
+            status=status.HTTP_201_CREATED,
+            content_type="application/json",
         )

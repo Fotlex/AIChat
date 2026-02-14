@@ -3,7 +3,6 @@ import time
 from celery import shared_task
 
 from apps.chat.models import Chat, Message
-from apps.chat.serializers import MessageSerializer
 from apps.chat.services import centrifugo_service
 
 
@@ -26,7 +25,12 @@ def generate_ai_response_task(self, chat_id, user_telegram_id):
             chat=chat, role=Message.Role.ASSISTANT, content=ai_content
         )
 
-        message_data = MessageSerializer(ai_message).data
+        message_data = {
+            "id": ai_message.id,
+            "role": ai_message.role,
+            "content": ai_message.content,
+            "created_at": ai_message.created_at.isoformat(),
+        }
 
         centrifugo_service.publish_personal_message(
             user_id=user_telegram_id,
@@ -35,4 +39,4 @@ def generate_ai_response_task(self, chat_id, user_telegram_id):
         )
 
     except Exception as exc:
-        raise self.retry(exc=exc, countdown=2 ** self.request.retries)
+        raise self.retry(exc=exc, countdown=2**self.request.retries)

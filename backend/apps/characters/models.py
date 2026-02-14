@@ -44,14 +44,14 @@ class Character(models.Model):
     )
 
     creator = models.ForeignKey(
-        'users.User',
+        "users.User",
         on_delete=models.SET_NULL,
-        related_name='characters',
+        related_name="characters",
         verbose_name="Создатель",
         null=True,
         blank=True,
     )
-    
+
     is_active = models.BooleanField(
         "Активен",
         default=True,
@@ -64,4 +64,3 @@ class Character(models.Model):
     class Meta:
         verbose_name = "Персонаж"
         verbose_name_plural = "Персонажи"
-        ordering = ["name"]
