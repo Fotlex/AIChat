@@ -169,8 +169,6 @@ services:
       - ./nginx/convert_env.sh:/docker-entrypoint.d/01-convert_env.sh:ro
       - static-volume:/app/backend/static_root:ro
       - media-volume:/app/backend/media:ro
-    env_file:
-      - ./nginx/nginx.env
     environment:
       ALLOWED_HOSTS: ${ALLOWED_HOSTS}
     depends_on:
