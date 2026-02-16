@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/vue-virtual": "^3.13.18",
     "@twa-dev/sdk": "^8.0.2",
     "axios": "^1.12.2",
     "centrifuge": "^5.5.3",

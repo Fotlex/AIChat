@@ -1,70 +1,59 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
-import { useRouter } from "vue-router";
 import { useCharactersStore } from "@/store/characters";
-
-import CharacterList from "@/components/CharacterList.vue"; 
+import VirtualCharacterGrid from "@/components/VirtualCharacterGrid.vue";
 import GenderFilter from "@/components/GenderFilter.vue";
+import SortDropdown from "@/components/SortDropdown.vue";
 
-const charactersStore = useCharactersStore();
-const router = useRouter();
+const store = useCharactersStore();
 
 onMounted(() => {
-  if (charactersStore.characters.length === 0) {
-    charactersStore.fetchCharacters();
-  }
+  store.fetchCharacters();
 });
-
-const handleSelectCharacter = (id: number) => {
-  router.push({ name: "chat", params: { id } });
-};
-
-const handleToggleFavorite = (id: number) => {
-  charactersStore.toggleFavorite(id);
-};
 </script>
 
 <template>
   <div class="view-container">
-    <GenderFilter />
-
-    <div v-if="charactersStore.isLoading" class="status-message">
-      Загрузка персонажей...
+    <div class="filters-header">
+      <GenderFilter />
+      <SortDropdown />
     </div>
 
-    <div v-else-if="charactersStore.error" class="status-message error">
-      Ошибка: {{ charactersStore.error }}
+    <div class="content-area">
+      <div v-if="store.error" class="error-msg">{{ store.error }}</div>
+
+      <VirtualCharacterGrid />
     </div>
-
-    <CharacterList
-      v-else-if="charactersStore.filteredCharacters.length > 0"
-      :characters="charactersStore.filteredCharacters" 
-      @select-character="handleSelectCharacter"
-      @toggle-favorite="handleToggleFavorite"
-    />
-
-    <div v-else class="status-message">Персонажи не найдены.</div>
   </div>
 </template>
 
 <style scoped>
 .view-container {
-  width: 100%;
-  min-height: 100%;
   display: flex;
   flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background-color: #1a1a1a;
+  overflow: hidden;
 }
-.status-message {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+
+.filters-header {
+  flex-shrink: 0;
+  background: rgba(26, 26, 26, 0.95);
+  backdrop-filter: blur(10px);
+  z-index: 10;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.content-area {
   flex-grow: 1;
-  color: white;
-  font-size: 18px;
-  padding: 20px;
-  text-align: center;
+  min-height: 0;
+  position: relative;
 }
-.status-message.error {
-  color: #ff8a8a;
+
+.error-msg {
+  color: #ff4d4d;
+  text-align: center;
+  padding: 20px;
 }
 </style>

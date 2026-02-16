@@ -1,77 +1,113 @@
 import { defineStore } from "pinia";
 import { getCharacters } from "@/api";
 import type { Character } from "@/types";
-import { useUserStore } from "./user";
 
-type FilterMode = 'F' | 'M' | 'yours';
+export type GenderFilter = "F" | "M";
+export type SortOption = "recent" | "popular";
 
-export interface CharactersState {
-  characters: Character[];
+interface ListState {
+  items: Character[];
+  ids: Set<number>;
+  nextCursor: string | null;
   isLoading: boolean;
-  error: string | null;
-  activeFilter: FilterMode;
+  isLoaded: boolean;
 }
 
+interface State {
+  lists: Record<string, ListState>;
+
+  activeGender: GenderFilter;
+  activeSort: SortOption;
+
+  error: string | null;
+}
+
+const createEmptyList = (): ListState => ({
+  items: [],
+  ids: new Set(),
+  nextCursor: null,
+  isLoading: false,
+  isLoaded: false,
+});
+
 export const useCharactersStore = defineStore("characters", {
-  state: (): CharactersState => ({
-    characters: [],
-    isLoading: false,
+  state: (): State => ({
+    lists: {},
+    activeGender: "F",
+    activeSort: "popular",
     error: null,
-    activeFilter: 'F',
   }),
 
   getters: {
-    getCharacterById: (state) => (id: number) => {
-      return state.characters.find((c) => c.id === id);
+    currentKey(state): string {
+      return `${state.activeGender}_${state.activeSort}`;
     },
-    
-    filteredCharacters(state): Character[] {
-      const userStore = useUserStore();
-      const currentUserId = userStore.currentUser?.telegram_id;
 
-      switch (state.activeFilter) {
-        case 'F':
-          return state.characters.filter(c => c.gender === 'F' && c.creator === null);
-        
-        case 'M':
-          return state.characters.filter(c => c.gender === 'M' && c.creator === null);
-        
-        case 'yours':
-          if (!currentUserId) return [];
-          return state.characters.filter(c => c.creator === currentUserId);
-        
-        default:
-          return state.characters.filter(c => c.gender === 'F' && c.creator === null);
+    currentList(state): ListState {
+      const key = this.currentKey;
+      if (!state.lists[key]) {
+        state.lists[key] = createEmptyList();
       }
-    }
+      return state.lists[key];
+    },
+
+    chunkedItems(): Character[][] {
+      const items = this.currentList.items;
+      const chunks: Character[][] = [];
+      for (let i = 0; i < items.length; i += 2) {
+        chunks.push(items.slice(i, i + 2));
+      }
+      return chunks;
+    },
   },
 
   actions: {
+    setGender(gender: GenderFilter) {
+      this.activeGender = gender;
+      this.checkAndLoad();
+    },
+
+    setSort(sort: SortOption) {
+      this.activeSort = sort;
+      this.checkAndLoad();
+    },
+
+    checkAndLoad() {
+      if (!this.currentList.isLoaded && !this.currentList.isLoading) {
+        this.fetchCharacters();
+      }
+    },
+
     async fetchCharacters() {
-      if (this.characters.length > 0 || this.isLoading) return;
+      const list = this.currentList;
 
-      this.isLoading = true;
+      if (list.isLoading || (list.isLoaded && !list.nextCursor)) return;
+
+      list.isLoading = true;
       this.error = null;
-      try {
-        this.characters = await getCharacters();
-      } catch (err) {
-        this.error = err instanceof Error ? err.message : "Произошла ошибка при загрузке персонажей";
-      } finally {
-        this.isLoading = false;
-      }
-    },
 
-    async toggleFavorite(characterId: number) {
-      const character = this.characters.find((c) => c.id === characterId);
-      if (character) {
-        console.log(
-          `STORE: Запрос на изменение "избранного" для ${character.name}.`
-        );
+      try {
+        const response = await getCharacters({
+          gender: this.activeGender,
+          sort: this.activeSort,
+          cursor: list.nextCursor || undefined,
+        });
+
+        const newItems = response.items.filter((char) => {
+          if (list.ids.has(char.id)) return false;
+          list.ids.add(char.id);
+          return true;
+        });
+
+        list.items.push(...newItems);
+        list.nextCursor = response.next_cursor;
+        list.isLoaded = true;
+      } catch (e: any) {
+        this.error = "Не удалось загрузить персонажей";
+        console.error(e);
+      } finally {
+        list.isLoading = false;
       }
     },
-    
-    setFilter(filter: FilterMode) {
-      this.activeFilter = filter;
-    }
   },
 });

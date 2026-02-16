@@ -1,7 +1,18 @@
 import apiClient from "./apiClient";
-import type { Character } from "@/types";
+import type { Character, PaginatedResponse } from "@/types";
 
-export const getCharacters = async (): Promise<Character[]> => {
-  const response = await apiClient.get<Character[]>("/characters/");
+interface FetchParams {
+  gender?: "M" | "F";
+  sort?: "recent" | "popular";
+  cursor?: string;
+}
+
+export const getCharacters = async (
+  params: FetchParams,
+): Promise<PaginatedResponse<Character>> => {
+  const response = await apiClient.get<PaginatedResponse<Character>>(
+    "/characters/",
+    { params },
+  );
   return response.data;
 };

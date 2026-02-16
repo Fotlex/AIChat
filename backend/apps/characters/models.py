@@ -52,6 +52,8 @@ class Character(models.Model):
         blank=True,
     )
 
+    likes_count = models.PositiveIntegerField("Лайки", default=0, db_index=True)
+
     is_active = models.BooleanField(
         "Активен",
         default=True,
@@ -64,3 +66,22 @@ class Character(models.Model):
     class Meta:
         verbose_name = "Персонаж"
         verbose_name_plural = "Персонажи"
+
+
+class CharacterLike(models.Model):
+    user = models.ForeignKey(
+        "users.User",
+        on_delete=models.CASCADE,
+        related_name="character_likes",
+        verbose_name="Пользователь",
+    )
+    character = models.ForeignKey(
+        Character,
+        on_delete=models.CASCADE,
+        related_name="user_likes",
+        verbose_name="Персонаж",
+    )
+    created_at = models.DateTimeField("Дата лайка", auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "character")

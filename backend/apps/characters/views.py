@@ -19,7 +19,7 @@ class CharacterListView(APIView):
 
     def get(self, request):
         params = request.query_params
-        limit = 20
+        limit = 40
 
         queryset = Character.objects.filter(is_active=True)
 
@@ -55,7 +55,13 @@ class CharacterListView(APIView):
 
         characters = list(
             queryset.order_by(*order_by)[: limit + 1].values(
-                "id", "name", "gender", "description", "photo", *sort_fields
+                "id",
+                "name",
+                "gender",
+                "description",
+                "photo",
+                "likes_count",
+                *sort_fields,
             )
         )
 
@@ -75,8 +81,7 @@ class CharacterListView(APIView):
         return HttpResponse(
             orjson.dumps(
                 {
-                    "characters": characters,
-                    "has_more": has_more,
+                    "items": characters,
                     "next_cursor": next_cursor,
                 }
             ),

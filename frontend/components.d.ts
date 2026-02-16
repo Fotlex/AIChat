@@ -21,7 +21,9 @@ declare module 'vue' {
     ILocalSend: typeof import('~icons/local/send')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SortDropdown: typeof import('./src/components/SortDropdown.vue')['default']
     TariffCard: typeof import('./src/components/TariffCard.vue')['default']
     TopNav: typeof import('./src/components/TopNav.vue')['default']
+    VirtualCharacterGrid: typeof import('./src/components/VirtualCharacterGrid.vue')['default']
   }
 }

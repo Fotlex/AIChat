@@ -5,6 +5,7 @@ export interface Character {
   description: string;
   photo: string | null;
   creator: number | null;
+  likes_count: number;
 }
 
 export interface User {
@@ -41,4 +42,9 @@ export interface PaginatedResponse<T> {
   next: string | null;
   previous: string | null;
   results: T;
+}
+
+export interface PaginatedResponse<T> {
+  next_cursor: string | null;
+  items: T[];
 }

@@ -1,123 +1,117 @@
 <script setup lang="ts">
 import type { Character } from "@/types";
 
-defineProps<{ character: Character }>();
+const props = defineProps<{
+  character: Character | null;
+}>();
 
 const emit = defineEmits<{
   (e: "select", id: number): void;
-  (e: "favorite", id: number): void;
 }>();
 
-const isFavorite = false;
+function formatLikes(count: number): string {
+  if (count >= 1000) return (count / 1000).toFixed(1) + "K";
+  return count.toString();
+}
 </script>
 
 <template>
-  <div class="card" @click="emit('select', character.id)">
-    <img :src="character.photo" :alt="character.name" class="card-image" />
+  <div v-if="character" class="card" @click="emit('select', character.id)">
+    <img
+      :src="character.photo || '/default-avatar.png'"
+      alt=""
+      class="card-image"
+      loading="lazy"
+      decoding="async"
+    />
+
     <div class="card-overlay">
-      <div class="card-info">
-        <h3 class="card-name">{{ character.name }}</h3>
-        <p class="card-description">{{ character.description }}</p>
+      <div class="likes-badge">
+        <i-local-heart class="heart-icon" />
+        <span>{{ formatLikes(character.likes_count) }}</span>
       </div>
-      <div class="card-actions">
-        
-        <button
-          class="icon-button"
-          @click.stop="emit('favorite', character.id)"
-        >
-          <i-local-heart :class="{ active: isFavorite }" />
-        </button>
+
+      <div class="card-info">
+        <div class="card-name">{{ character.name }}</div>
+        <div class="card-desc">{{ character.description }}</div>
       </div>
     </div>
   </div>
+
+  <div v-else class="card-placeholder"></div>
 </template>
 
-    
 <style scoped>
-.icon-button .active {
-  fill: #ff4d4d;
-  stroke: #ff4d4d;
-}
-
 .card {
   position: relative;
-  border-radius: 20px;
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
   overflow: hidden;
+  background-color: #2c2c2e;
+  transform: translateZ(0);
   cursor: pointer;
-  aspect-ratio: 3 / 4;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s ease-in-out;
-  background-color: #333;
-}
-
-.card:hover {
-  transform: scale(1.03);
 }
 
 .card-image {
-  position: absolute;
-  top: 0;
-  left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  z-index: 1;
+  display: block;
 }
 
 .card-overlay {
-  position: relative;
-  z-index: 2;
-  padding: 16px;
-  color: white;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: linear-gradient(
     180deg,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.7) 100%
+    rgba(0, 0, 0, 0) 50%,
+    rgba(0, 0, 0, 0.85) 100%
   );
-  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 12px;
 }
 
-.card-info {
-  padding-right: 52px;
+.likes-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  border-radius: 12px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.heart-icon {
+  width: 14px;
+  height: 14px;
+  fill: #ff4d4d;
 }
 
 .card-name {
-  font-size: 24px;
-  font-weight: bold;
-  margin: 0 0 4px;
-  overflow-wrap: break-word;
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-.card-description {
-  font-size: 14px;
-  margin: 0;
-  opacity: 0.9;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+.card-desc {
+  font-size: 12px;
+  color: #d1d1d6;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.card-actions {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
-}
-
-.icon-button {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: white;
+  opacity: 0.9;
 }
 </style>
