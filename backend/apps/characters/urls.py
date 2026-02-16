@@ -1,7 +1,10 @@
 from django.urls import path
 
-from .views import CharacterListView
+from .views import CharacterLikeView, CharacterListView
+
+app_name = "characters"
 
 urlpatterns = [
-    path("characters/", CharacterListView.as_view(), name="character-list"),
+    path("", CharacterListView.as_view(), name="list"),
+    path("<int:pk>/like/", CharacterLikeView.as_view(), name="like"),
 ]

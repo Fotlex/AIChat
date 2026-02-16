@@ -1,6 +1,7 @@
 import orjson
 from django.db import transaction
 from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
@@ -31,19 +32,13 @@ class ChatDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, chat_id):
-        cursor = request.query_params.get("cursor")
         limit = 30
 
-        if not Chat.objects.filter(
-            id=chat_id, user_id=request.user.telegram_id
-        ).exists():
-            return HttpResponse(
-                orjson.dumps({"error": "Chat not found"}),
-                status=status.HTTP_404_NOT_FOUND,
-                content_type="application/json",
-            )
+        query = Message.objects.filter(
+            chat_id=chat_id, chat__user_id=request.user.telegram_id
+        )
 
-        query = Message.objects.filter(chat_id=chat_id)
+        cursor = request.query_params.get("cursor")
         if cursor:
             query = query.filter(id__lt=int(cursor))
 
@@ -65,8 +60,7 @@ class ChatDetailView(APIView):
         return HttpResponse(
             orjson.dumps(
                 {
-                    "messages": messages,
-                    "has_more": has_more,
+                    "items": messages,
                     "next_cursor": next_cursor,
                 }
             ),
@@ -87,6 +81,7 @@ class MessageSendView(APIView):
             )
 
         content = content.strip()[:1000]
+        now = timezone.now()
         user_id = request.user.telegram_id
 
         chat_id = (
@@ -98,7 +93,10 @@ class MessageSendView(APIView):
         with transaction.atomic():
             if chat_id:
                 last_msg = Message.objects.create(
-                    chat_id=chat_id, role=Message.Role.USER, content=content
+                    chat_id=chat_id,
+                    role=Message.Role.USER,
+                    content=content,
+                    created_at=now,
                 )
             else:
                 chat, created = Chat.objects.get_or_create(
@@ -108,36 +106,45 @@ class MessageSendView(APIView):
 
                 if not created:
                     last_msg = Message.objects.create(
-                        chat_id=chat_id, role=Message.Role.USER, content=content
+                        chat_id=chat_id,
+                        role=Message.Role.USER,
+                        content=content,
+                        created_at=now,
                     )
                 else:
                     from apps.characters.models import Character
 
-                    char_data = (
+                    welcome_text = (
                         Character.objects.filter(id=character_id)
-                        .values("welcome_message")
+                        .values_list("welcome_message", flat=True)
                         .first()
                     )
 
-                    messages_to_create = []
-                    if char_data and char_data["welcome_message"]:
-                        messages_to_create.append(
+                    msgs = []
+                    if welcome_text:
+                        msgs.append(
                             Message(
                                 chat=chat,
                                 role=Message.Role.ASSISTANT,
-                                content=char_data["welcome_message"],
+                                content=welcome_text,
+                                created_at=now,
                             )
                         )
 
-                    messages_to_create.append(
-                        Message(chat=chat, role=Message.Role.USER, content=content)
+                    msgs.append(
+                        Message(
+                            chat=chat,
+                            role=Message.Role.USER,
+                            content=content,
+                            created_at=now,
+                        )
                     )
 
-                    created_msgs = Message.objects.bulk_create(messages_to_create)
+                    created_msgs = Message.objects.bulk_create(msgs)
                     last_msg = created_msgs[-1]
 
             Chat.objects.filter(id=chat_id).update(
-                last_message_text=content, last_message_at=last_msg.created_at
+                last_message_text=content, last_message_at=now
             )
 
             transaction.on_commit(

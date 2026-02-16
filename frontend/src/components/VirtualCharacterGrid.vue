@@ -1,24 +1,32 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { useCharactersStore } from "@/store/characters";
 import CharacterCard from "./CharacterCard.vue";
+import GenderFilter from "./GenderFilter.vue";
+import SortDropdown from "./SortDropdown.vue";
 import { useRouter } from "vue-router";
 
 const store = useCharactersStore();
 const router = useRouter();
 
 const parentRef = ref<HTMLElement | null>(null);
-
 const chunkedItems = computed(() => store.chunkedItems);
+
+onMounted(() => {
+  if (store.currentList.items.length === 0) {
+    store.fetchCharacters();
+  }
+});
 
 const rowVirtualizer = useVirtualizer(
   computed(() => ({
     count: chunkedItems.value.length,
     getScrollElement: () => parentRef.value,
     estimateSize: () => 260,
-    overscan: 4,
-  }))
+    overscan: 5,
+    scrollMargin: 10,
+  })),
 );
 
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
@@ -33,8 +41,7 @@ watch(
   (virtualItems) => {
     if (!virtualItems.length) return;
     const lastItem = virtualItems[virtualItems.length - 1];
-    if (!lastItem) return;
-    if (lastItem.index >= chunkedItems.value.length - 2) {
+    if (lastItem && lastItem.index >= chunkedItems.value.length - 2) {
       store.fetchCharacters();
     }
   },
@@ -43,6 +50,11 @@ watch(
 
 <template>
   <div ref="parentRef" class="virtual-scroll-container">
+    <div class="scrolling-header">
+      <GenderFilter />
+      <SortDropdown />
+    </div>
+
     <div
       class="virtual-sizer"
       :style="{
@@ -91,7 +103,19 @@ watch(
   width: 100%;
   overflow-y: auto;
   padding: 0 16px;
-  padding-bottom: 90px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scrolling-header {
+  width: 100%;
+  min-height: 85px;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+}
+
+.virtual-sizer {
+  width: 100%;
 }
 
 .virtual-row {
@@ -103,6 +127,7 @@ watch(
   display: flex;
   gap: 12px;
   height: 100%;
+  width: 100%;
 }
 
 .row-item {
@@ -111,20 +136,20 @@ watch(
 }
 
 .bottom-loader {
-  height: 50px;
+  height: 60px;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 10px;
+  margin-bottom: 90px;
 }
 
 .spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #007aff;
   border-radius: 50%;
-  animation: spin 0.8s infinite linear;
+  animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {

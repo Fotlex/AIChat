@@ -1,12 +1,16 @@
 import base64
 
 import orjson
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import Exists, F, IntegerField, OuterRef, Q, Subquery
 from django.http import HttpResponse
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from .models import Character
+from apps.chat.models import Chat
+
+from .models import Character, CharacterLike
 
 
 class CharacterListView(APIView):
@@ -19,15 +23,26 @@ class CharacterListView(APIView):
 
     def get(self, request):
         params = request.query_params
-        limit = 40
+        limit = 30
 
+        user = request.user
         queryset = Character.objects.filter(is_active=True)
+
+        has_chat_subquery = Chat.objects.filter(user=user, character=OuterRef("pk"))
+
+        is_liked_subquery = CharacterLike.objects.filter(
+            user=user, character=OuterRef("pk")
+        )
+
+        queryset = queryset.annotate(
+            has_chat=Exists(has_chat_subquery), is_liked=Exists(is_liked_subquery)
+        )
 
         is_yours = params.get("yours")
         if is_yours == "1":
-            queryset = queryset.filter(creator_id=request.user.telegram_id)
+            queryset = queryset.filter(creator_id=user.telegram_id)
         elif is_yours == "0":
-            queryset = queryset.exclude(creator_id=request.user.telegram_id)
+            queryset = queryset.exclude(creator_id=user.telegram_id)
 
         gender = params.get("gender")
         if gender in ("M", "F"):
@@ -51,6 +66,19 @@ class CharacterListView(APIView):
             except Exception:
                 pass
 
+        chat_id_subquery = Chat.objects.filter(
+            user=user, character=OuterRef("pk")
+        ).values("id")[:1]
+
+        is_liked_exists = CharacterLike.objects.filter(
+            user=user, character=OuterRef("pk")
+        )
+
+        queryset = Character.objects.filter(is_active=True).annotate(
+            chat_id=Subquery(chat_id_subquery, output_field=IntegerField()),
+            is_liked=Exists(is_liked_exists)
+        )
+
         order_by = [f"-{f}" for f in sort_fields]
 
         characters = list(
@@ -61,6 +89,9 @@ class CharacterListView(APIView):
                 "description",
                 "photo",
                 "likes_count",
+                "welcome_message",
+                "chat_id",
+                "is_liked",
                 *sort_fields,
             )
         )
@@ -87,3 +118,37 @@ class CharacterListView(APIView):
             ),
             content_type="application/json",
         )
+
+
+class CharacterLikeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        user = request.user
+        wanted_active = request.data.get("active")
+
+        if wanted_active is None:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            if wanted_active:
+                _, created = CharacterLike.objects.get_or_create(
+                    user=user, character_id=pk
+                )
+
+                if created:
+                    Character.objects.filter(pk=pk).update(
+                        likes_count=F("likes_count") + 1
+                    )
+
+            else:
+                deleted_count, _ = CharacterLike.objects.filter(
+                    user=user, character_id=pk
+                ).delete()
+
+                if deleted_count > 0:
+                    Character.objects.filter(pk=pk, likes_count__gt=0).update(
+                        likes_count=F("likes_count") - 1
+                    )
+
+        return HttpResponse(status=status.HTTP_204_NO_CONTENT)
