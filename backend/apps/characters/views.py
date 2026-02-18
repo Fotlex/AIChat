@@ -28,16 +28,6 @@ class CharacterListView(APIView):
         user = request.user
         queryset = Character.objects.filter(is_active=True)
 
-        has_chat_subquery = Chat.objects.filter(user=user, character=OuterRef("pk"))
-
-        is_liked_subquery = CharacterLike.objects.filter(
-            user=user, character=OuterRef("pk")
-        )
-
-        queryset = queryset.annotate(
-            has_chat=Exists(has_chat_subquery), is_liked=Exists(is_liked_subquery)
-        )
-
         is_yours = params.get("yours")
         if is_yours == "1":
             queryset = queryset.filter(creator_id=user.telegram_id)
@@ -74,7 +64,7 @@ class CharacterListView(APIView):
             user=user, character=OuterRef("pk")
         )
 
-        queryset = Character.objects.filter(is_active=True).annotate(
+        queryset = queryset.annotate(
             chat_id=Subquery(chat_id_subquery, output_field=IntegerField()),
             is_liked=Exists(is_liked_exists)
         )

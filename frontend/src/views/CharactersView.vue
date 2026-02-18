@@ -12,6 +12,6 @@ import VirtualCharacterGrid from "@/components/VirtualCharacterGrid.vue";
 .view-container {
   height: 100%;
   width: 100%;
-  overflow: hidden; 
+  overflow: hidden;
 }
 </style>

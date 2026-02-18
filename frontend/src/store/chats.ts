@@ -1,79 +1,138 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { getChats, getOrCreateChatWithMessages, getMessagesByUrl } from "@/api";
-import type { Chat, Message } from "@/types";
 import apiClient from "@/api/apiClient";
+import type { Message, ChatState } from "@/types";
 import { useCharactersStore } from "./characters";
 
 export const useChatsStore = defineStore("chats", () => {
-  const chatsList = ref<Chat[]>([]);
-  const currentChatMessages = ref<Message[]>([]);
-  const currentChatDetails = ref<Chat | null>(null);
-  const isLoading = ref(false);
-  const isLoadingMore = ref(false);
+  const chatCache = ref<Record<number, ChatState>>({});
+
+  const activeCharacterId = ref<number | null>(null);
   const isSending = ref(false);
-  const error = ref<string | null>(null);
-  const nextMessagesUrl = ref<string | null>(null);
+  const isLoadingHistory = ref(false);
 
-  const currentCharacter = computed(
-    () => currentChatDetails.value?.character ?? null
-  );
-  const hasMoreMessages = computed(() => nextMessagesUrl.value !== null);
+  const activeChatState = computed(() => {
+    if (activeCharacterId.value === null) return null;
+    return chatCache.value[activeCharacterId.value] || null;
+  });
 
-  async function fetchChatsList() {
-    isLoading.value = true;
-    error.value = null;
-    try {
-      chatsList.value = await getChats();
-    } catch (e: any) {
-      error.value = "Не удалось загрузить список чатов";
-    } finally {
-      isLoading.value = false;
-    }
-  }
+  async function enterChat(characterId: number) {
+    activeCharacterId.value = characterId;
 
-  async function loadChat(characterId: number) {
-    isLoading.value = true;
-    error.value = null;
-    currentChatMessages.value = [];
-    currentChatDetails.value = null;
-    nextMessagesUrl.value = null;
+    if (!chatCache.value[characterId]) {
+      const charStore = useCharactersStore();
+      const character = charStore.currentList.items.find(
+        (c) => c.id === characterId,
+      );
 
-    const charactersStore = useCharactersStore();
-    const existingCharacter = charactersStore.getCharacterById(characterId);
-    if (existingCharacter) {
-      currentChatDetails.value = {
-        id: -1,
-        character: existingCharacter,
-        last_message: null,
-        created_at: "",
+      const initialState: ChatState = {
+        characterId,
+        chatId: character?.chat_id || null,
+        messages: [],
+        nextCursor: null,
+        isFullyLoaded: false,
       };
+
+      if (!initialState.chatId && character?.welcome_message) {
+        initialState.messages = [
+          {
+            id: `welcome_${characterId}`,
+            role: "assistant",
+            content: character.welcome_message,
+            created_at: new Date().toISOString(),
+          },
+        ];
+        initialState.isFullyLoaded = true;
+      }
+
+      chatCache.value[characterId] = initialState;
     }
 
-    try {
-      const response = await getOrCreateChatWithMessages(characterId);
-      currentChatMessages.value = response.results.reverse();
-      currentChatDetails.value = response.chat;
-      nextMessagesUrl.value = response.next;
-    } catch (e: any) {
-      error.value = "Не удалось загрузить чат";
-    } finally {
-      isLoading.value = false;
+    const state = chatCache.value[characterId];
+    if (state.chatId && state.messages.length === 0) {
+      loadHistory(characterId);
     }
   }
 
-  async function loadMoreMessages() {
-    if (isLoadingMore.value || !nextMessagesUrl.value) return;
+  async function loadHistory(charId: number): Promise<boolean> {
+    const state = chatCache.value[charId];
+    if (
+      !state ||
+      !state.chatId ||
+      state.isFullyLoaded ||
+      isLoadingHistory.value
+    )
+      return false;
 
-    isLoadingMore.value = true;
+    isLoadingHistory.value = true;
     try {
-      const response = await getMessagesByUrl(nextMessagesUrl.value);
-      currentChatMessages.value.unshift(...response.results.reverse());
-      nextMessagesUrl.value = response.next;
-    } catch (e: any) {
-      console.error("Failed to load more messages", e);
+      const params = state.nextCursor ? { cursor: state.nextCursor } : {};
+      const { data } = await apiClient.get(`/chats/${state.chatId}/messages/`, {
+        params,
+      });
+
+      const historyMessages = data.items;
+
+      state.messages = [...historyMessages, ...state.messages];
+      state.nextCursor = data.next_cursor;
+
+      if (!data.next_cursor) {
+        state.isFullyLoaded = true;
+      }
+
+      return true;
+    } catch (e) {
+      console.error(e);
+      return false;
     } finally {
-      isLoadingMore.value = false;
+      isLoadingHistory.value = false;
+    }
+  }
+
+  async function sendMessage(content: string) {
+    const charId = activeCharacterId.value;
+    if (!charId || !content.trim()) return;
+
+    const state = chatCache.value[charId];
+    if (!state) return;
+
+    isSending.value = true;
+    const tempId = `temp_${Date.now()}`;
+
+    const userMsg: Message = {
+      id: tempId,
+      role: "user",
+      content,
+      created_at: new Date().toISOString(),
+      is_pending: true,
+    };
+
+    state.messages = [...state.messages, userMsg];
+
+    try {
+      const { data } = await apiClient.post<{ id: number; chat_id: number }>(
+        `/chats/character/${charId}/send/`,
+        { content },
+      );
+
+      const idx = state.messages.findIndex((m) => m.id === tempId);
+      if (idx !== -1) {
+        const newMsgs = [...state.messages];
+        newMsgs[idx] = { ...userMsg, id: data.id, is_pending: false };
+        state.messages = newMsgs;
+      }
+
+      if (!state.chatId) {
+        state.chatId = data.chat_id;
+        const charStore = useCharactersStore();
+        const char = charStore.currentList.items.find((c) => c.id === charId);
+        if (char) char.chat_id = data.chat_id;
+      }
+    } catch (e) {
+      state.messages = state.messages.filter((m) => m.id !== tempId);
+      console.error("Send failed", e);
+    } finally {
+      isSending.value = false;
     }
   }
 
@@ -81,53 +140,23 @@ export const useChatsStore = defineStore("chats", () => {
     chat_id: number;
     message: Message;
   }) {
-    console.log("ChatsStore: handling message", payload);
-    if (
-      currentChatDetails.value &&
-      currentChatDetails.value.id === payload.chat_id
-    ) {
-      currentChatMessages.value.push(payload.message);
-    }
-
-    const chatInList = chatsList.value.find((c) => c.id === payload.chat_id);
-    if (chatInList) {
-      chatInList.last_message = payload.message;
-    }
-  }
-
-  async function sendUserMessage(content: string) {
-    if (!content.trim() || !currentChatDetails.value) return;
-
-    isSending.value = true;
-
-    try {
-      const response = await apiClient.post<Message>(
-        `/chats/${currentChatDetails.value.id}/send_message/`,
-        { content }
-      );
-
-      currentChatMessages.value.push(response.data);
-    } catch (e) {
-      console.error("Send error", e);
-    } finally {
-      isSending.value = false;
+    for (const charId in chatCache.value) {
+      const state = chatCache.value[charId];
+      if (state && state.chatId === payload.chat_id) {
+        if (state.messages.some((m) => m.id === payload.message.id)) return;
+        state.messages = [...state.messages, payload.message];
+        break;
+      }
     }
   }
 
   return {
-    chatsList,
-    currentChatMessages,
-    currentChatDetails,
-    currentCharacter,
-    isLoading,
-    isLoadingMore,
+    activeChatState,
+    isLoadingHistory,
     isSending,
-    error,
-    hasMoreMessages,
-    fetchChatsList,
-    loadChat,
-    loadMoreMessages,
+    enterChat,
+    sendMessage,
+    loadHistory,
     handleIncomingMessage,
-    sendUserMessage,
   };
 });

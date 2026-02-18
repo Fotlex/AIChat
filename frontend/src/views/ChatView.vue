@@ -1,179 +1,226 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch, computed } from "vue";
+import {
+  ref,
+  onMounted,
+  computed,
+  watch,
+  nextTick,
+  type ComponentPublicInstance,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useVirtualizer } from "@tanstack/vue-virtual";
 import WebApp from "@twa-dev/sdk";
 import { useChatsStore } from "@/store/chats";
 import { useUserStore } from "@/store/user";
-import { useSocketStore } from "@/store/socket";
+import { useCharactersStore } from "@/store/characters";
 import ChatHeader from "@/components/ChatHeader.vue";
 
 const route = useRoute();
 const router = useRouter();
 const chatsStore = useChatsStore();
 const userStore = useUserStore();
-const socketStore = useSocketStore();
-
-const messageInput = ref("");
-const messagesContainer = ref<HTMLElement | null>(null);
-const textareaRef = ref<HTMLTextAreaElement | null>(null);
-const chatLayout = ref<HTMLElement | null>(null);
-
-const initialInputTop = ref(0);
+const charStore = useCharactersStore();
 
 const characterId = Number(route.params.id);
+const parentRef = ref<HTMLElement | null>(null);
+const messageInput = ref("");
 
-const handleInputFocus = () => {
-  if (textareaRef.value) {
-    initialInputTop.value = textareaRef.value.getBoundingClientRect().top;
-  }
+const character = computed(
+  () => charStore.currentList.items.find((c) => c.id === characterId) || null,
+);
+
+const chatState = computed(() => chatsStore.activeChatState);
+const messages = computed(() => chatState.value?.messages || []);
+
+const rowVirtualizer = useVirtualizer(
+  computed(() => ({
+    count: messages.value.length,
+    getScrollElement: () => parentRef.value,
+    estimateSize: () => 80,
+    overscan: 5,
+    getItemKey: (index) => messages.value[index]?.id ?? index,
+  })),
+);
+
+const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
+const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+
+const measureElementRef = (el: Element | ComponentPublicInstance | null) => {
+  if (!el) return;
+  rowVirtualizer.value.measureElement(el as Element);
 };
 
-const adjustScrollAfterResize = () => {
-  if (chatLayout.value) {
-    chatLayout.value.style.setProperty(
-      "--app-height",
-      `${WebApp.viewportHeight}px`
-    );
-  }
-
-  if (
-    !initialInputTop.value ||
-    !textareaRef.value ||
-    !messagesContainer.value
-  ) {
-    return;
-  }
-
-  const finalInputTop = textareaRef.value.getBoundingClientRect().top;
-
-  const shift = initialInputTop.value - finalInputTop;
-
-  if (shift > 0) {
-    messagesContainer.value.scrollTop += shift;
-  }
-
-  initialInputTop.value = 0;
-};
-
-const scrollToBottom = async (behavior: "smooth" | "auto" = "auto") => {
-  await nextTick();
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTo({
-      top: messagesContainer.value.scrollHeight,
-      behavior: behavior,
+const scrollToBottom = (options?: ScrollToOptions) => {
+  if (parentRef.value) {
+    parentRef.value.scrollTo({
+      top: parentRef.value.scrollHeight,
+      ...options,
     });
   }
 };
 
 onMounted(async () => {
-  WebApp.expand();
-
-  if (!userStore.currentUser) {
-    userStore.fetchUser();
+  try {
+    if (WebApp.initData) {
+      WebApp.expand();
+    }
+  } catch (e) {
+    console.warn("WebApp init failed:", e);
   }
 
-  socketStore.connect();
+  if (!userStore.currentUser) await userStore.fetchUser();
+  await chatsStore.enterChat(characterId);
 
-  await chatsStore.loadChat(characterId);
-
-  if (chatLayout.value) {
-    chatLayout.value.style.setProperty(
-      "--app-height",
-      `${WebApp.viewportHeight}px`
-    );
-  }
-  WebApp.onEvent("viewportChanged", adjustScrollAfterResize);
-
-  scrollToBottom("auto");
-});
-
-onUnmounted(() => {
-  WebApp.offEvent("viewportChanged", adjustScrollAfterResize);
+  nextTick(() => {
+    if (parentRef.value) {
+      parentRef.value.scrollTop = parentRef.value.scrollHeight;
+    }
+  });
 });
 
 watch(
-  () => chatsStore.currentChatMessages.length,
-  (newLength, oldLength) => {
-    if (newLength > oldLength) {
-      scrollToBottom("smooth");
+  () => messages.value.length,
+  (newLen, oldLen) => {
+    if (newLen === 0) return;
+
+    if (oldLen === 0) {
+      nextTick(() => {
+        scrollToBottom({ behavior: "auto" });
+      });
+      return;
     }
-  }
+
+    if (!chatsStore.isLoadingHistory && newLen > oldLen) {
+      nextTick(() => {
+        scrollToBottom({ behavior: "smooth" });
+      });
+    }
+  },
+  { flush: "post" },
 );
 
-const isSendButtonDisabled = computed(() => !messageInput.value.trim());
+const handleScroll = async (e: Event) => {
+  const el = e.target as HTMLElement;
 
-const adjustTextareaHeight = () => {
-  const el = textareaRef.value;
-  if (el) {
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
+  if (
+    el.scrollTop < 50 &&
+    !chatsStore.isLoadingHistory &&
+    chatState.value?.nextCursor &&
+    chatState.value?.chatId
+  ) {
+    const oldScrollHeight = el.scrollHeight;
+    const oldScrollTop = el.scrollTop;
+
+    const hasNewData = await chatsStore.loadHistory(characterId);
+
+    if (hasNewData) {
+      await nextTick();
+
+      const newScrollHeight = el.scrollHeight;
+      const heightDifference = newScrollHeight - oldScrollHeight;
+
+      el.scrollTop = oldScrollTop + heightDifference;
+    }
   }
 };
 
 const sendMessage = async () => {
-  if (isSendButtonDisabled.value) return;
-
-  const content = messageInput.value;
+  if (!messageInput.value.trim() || chatsStore.isSending) return;
+  const text = messageInput.value;
   messageInput.value = "";
-  await chatsStore.sendUserMessage(content);
 
-  nextTick(() => {
-    adjustTextareaHeight();
-  });
+  if (parentRef.value) {
+    parentRef.value.scrollTo({
+      top: parentRef.value.scrollHeight,
+      behavior: "smooth",
+    });
+  }
+
+  await chatsStore.sendMessage(text);
 };
 
-const goBack = () => {
-  router.back();
+const formatTime = (iso: string) => {
+  return new Date(iso).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 </script>
 
 <template>
-  <div ref="chatLayout" class="chat-layout">
+  <div class="chat-layout">
     <ChatHeader
-      :character="chatsStore.currentCharacter"
+      :character="character"
       :balance="userStore.balance"
-      @back="goBack"
+      @back="router.back()"
     />
 
-    <main ref="messagesContainer" class="messages-container">
-      <div v-if="chatsStore.isLoading" class="loader">Загрузка чата...</div>
-      <div v-else class="messages-list">
+    <main ref="parentRef" class="messages-container" @scroll="handleScroll">
+      <div
+        class="virtual-sizer"
+        :style="{
+          height: `${totalSize}px`,
+          width: '100%',
+          position: 'relative',
+        }"
+      >
         <div
-          v-if="chatsStore.hasMoreMessages && !chatsStore.isLoadingMore"
-          class="load-more"
-          @click="chatsStore.loadMoreMessages()"
+          v-for="virtualRow in virtualRows"
+          :key="virtualRow.key.toString()"
+          :data-index="virtualRow.index"
+          :ref="measureElementRef"
+          class="virtual-row-wrapper"
+          :style="{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            transform: `translateY(${virtualRow.start}px)`,
+          }"
         >
-          Загрузить еще
+          <div
+            v-if="messages[virtualRow.index]"
+            class="message-row"
+            :class="{
+              'row-user': messages[virtualRow.index]!.role === 'user',
+              'row-assistant': messages[virtualRow.index]!.role === 'assistant',
+            }"
+          >
+            <div class="bubble">
+              <div class="bubble-text">
+                {{ messages[virtualRow.index]!.content }}
+              </div>
+              <div class="bubble-meta">
+                {{ formatTime(messages[virtualRow.index]!.created_at) }}
+                <span
+                  v-if="messages[virtualRow.index]!.is_pending"
+                  class="pending-icon"
+                  >🕒</span
+                >
+              </div>
+            </div>
+          </div>
         </div>
-        <div v-if="chatsStore.isLoadingMore" class="loader">Загрузка...</div>
+      </div>
 
-        <div
-          v-for="msg in chatsStore.currentChatMessages"
-          :key="msg.id"
-          :class="['message-bubble', `is-${msg.role}`]"
-        >
-          <div class="message-content">{{ msg.content }}</div>
-        </div>
+      <div v-if="chatsStore.isLoadingHistory" class="history-loader">
+        <div class="spinner-small"></div>
       </div>
     </main>
 
     <footer class="chat-footer">
       <div class="input-wrapper">
         <textarea
-          ref="textareaRef"
           v-model="messageInput"
-          @focus="handleInputFocus"
-          @input="messageInput = ($event.target as HTMLTextAreaElement).value"
-          @keydown.enter.exact.prevent="sendMessage"
-          placeholder="Введите сообщение..."
+          placeholder="Написать..."
           class="message-input"
           rows="1"
-          oninput="this.style.height = 'auto'; this.style.height = (this.scrollHeight) + 'px';"
+          @keydown.enter.prevent="sendMessage"
         ></textarea>
         <button
           @click="sendMessage"
-          :disabled="isSendButtonDisabled"
           class="send-button"
+          :disabled="!messageInput.trim() || chatsStore.isSending"
         >
           <i-local-send />
         </button>
@@ -183,114 +230,151 @@ const goBack = () => {
 </template>
 
 <style scoped>
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 12px;
+  -webkit-overflow-scrolling: touch;
+  padding-top: calc(60px + env(safe-area-inset-top));
+  overflow-anchor: none;
+}
+
 .chat-layout {
   display: flex;
   flex-direction: column;
-  height: var(--app-height, 100vh);
+  height: 100vh;
+  background: #0e0e10;
+}
+
+.virtual-sizer {
   width: 100%;
-  background: #000;
-  /* transition: height 0.2s ease-out; */
 }
-.messages-container {
-  flex-grow: 1;
-  overflow-y: auto;
-  padding: 16px;
-  /* display: flex;
-  flex-direction: column; */
-  padding-top: calc(66px + env(safe-area-inset-top));
-  /* padding-bottom: calc(66px + env(safe-area-inset-bottom)); */
+
+.virtual-row-wrapper {
+  padding: 4px 0;
+  box-sizing: border-box;
 }
-.messages-list {
+
+.message-row {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  /* margin-top: auto; */
-  /* padding-bottom: 8px; */
+  width: 100%;
 }
-.loader,
-.load-more {
-  text-align: center;
-  color: #8e8e93;
-  padding: 10px;
+
+.row-user {
+  justify-content: flex-end;
 }
-.load-more {
-  cursor: pointer;
-  text-decoration: underline;
+
+.row-assistant {
+  justify-content: flex-start;
 }
-.message-bubble {
-  max-width: 80%;
-  padding: 10px 15px;
-  word-wrap: break-word;
-  line-height: 1.4;
+
+.bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 18px;
   font-size: 15px;
+  line-height: 1.4;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
-.message-bubble.is-assistant {
-  align-self: flex-start;
-  background-color: #262629;
-  color: #e3e3e3;
-  border-radius: 20px 20px 20px 4px;
-}
-.message-bubble.is-user {
-  align-self: flex-end;
-  background-color: #5844b3;
+
+.row-user .bubble {
+  background: #5844b3;
   color: #fff;
-  border-radius: 20px 20px 5px 20px;
+  border-bottom-right-radius: 4px;
 }
+
+.row-assistant .bubble {
+  background: #262629;
+  color: #e3e3e3;
+  border-bottom-left-radius: 4px;
+}
+
+.bubble-meta {
+  font-size: 10px;
+  opacity: 0.6;
+  text-align: right;
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
 .chat-footer {
-  padding: 8px 16px;
-  background-color: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(10px);
-  padding-bottom: calc(8px + env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(80, 80, 80, 0.5);
-  flex-shrink: 0;
-  /* position: fixed; */
-  /* bottom: 0; */
-  /* width: 100%; */
+  padding: 10px;
+  background: #18181b;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  z-index: 10;
 }
+
 .input-wrapper {
   display: flex;
+  background: #2c2c2e;
+  border-radius: 20px;
+  padding: 8px 12px;
   align-items: center;
-  background-color: #2c2c2e;
-  border-radius: 22px;
-  padding: 5px;
 }
+
 .message-input {
-  flex-grow: 1;
+  flex: 1;
+  background: transparent;
   border: none;
-  background: none;
-  padding: 10px 15px;
-  color: white;
-  font-size: 16px;
+  color: #fff;
+  padding: 0;
   outline: none;
   resize: none;
-  max-height: 100px;
-  overflow-y: auto;
-  line-height: 1.4;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
-  letter-spacing: normal;
-  word-spacing: normal;
+  height: 24px;
+  line-height: 24px;
+  font-family: inherit;
+  font-size: 16px;
+  overflow: hidden;
 }
+
 .send-button {
   background: #7b61ff;
   border: none;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  width: 38px;
-  height: 38px;
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  margin-left: 8px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
-  flex-shrink: 0;
+  transition: opacity 0.2s;
 }
+
 .send-button:disabled {
-  background-color: #555;
-  cursor: not-allowed;
+  opacity: 0.5;
 }
-.send-button > :deep(svg) {
-  width: 24px;
-  height: 24px;
+
+.history-loader {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 10px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #7b61ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

@@ -7,6 +7,7 @@ export interface Character {
   creator: number | null;
   likes_count: number;
   welcome_message: string | null;
+  chat_id: number | null;
 }
 
 export interface User {
@@ -26,10 +27,11 @@ export interface Tariff {
 }
 
 export interface Message {
-  id: number;
+  id: number | string;
   role: "user" | "assistant" | "system";
   content: string;
   created_at: string;
+  is_pending?: boolean;
 }
 
 export interface Chat {
@@ -37,6 +39,14 @@ export interface Chat {
   character: Character;
   last_message: Message | null;
   created_at: string;
+}
+
+export interface ChatState {
+  characterId: number;
+  chatId: number | null;
+  messages: Message[];
+  nextCursor: string | null;
+  isFullyLoaded: boolean;
 }
 
 export interface PaginatedResponse<T> {

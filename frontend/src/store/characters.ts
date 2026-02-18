@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { getCharacters } from "@/api";
 import type { Character } from "@/types";
+import { shallowRef, computed, ref, triggerRef } from "vue";
 
 export type GenderFilter = "F" | "M";
 export type SortOption = "recent" | "popular";
@@ -13,101 +14,106 @@ interface ListState {
   isLoaded: boolean;
 }
 
-interface State {
-  lists: Record<string, ListState>;
+export const useCharactersStore = defineStore("characters", () => {
+  const lists = shallowRef<Record<string, ListState>>({});
 
-  activeGender: GenderFilter;
-  activeSort: SortOption;
+  const activeGender = ref<GenderFilter>("F");
+  const activeSort = ref<SortOption>("popular");
+  const error = ref<string | null>(null);
 
-  error: string | null;
-}
+  const currentKey = computed(
+    () => `${activeGender.value}_${activeSort.value}`,
+  );
 
-const createEmptyList = (): ListState => ({
-  items: [],
-  ids: new Set(),
-  nextCursor: null,
-  isLoading: false,
-  isLoaded: false,
-});
+  const currentList = computed(() => {
+    const key = currentKey.value;
+    if (!lists.value[key]) {
+      lists.value[key] = {
+        items: [],
+        ids: new Set(),
+        nextCursor: null,
+        isLoading: false,
+        isLoaded: false,
+      };
+    }
+    return lists.value[key];
+  });
 
-export const useCharactersStore = defineStore("characters", {
-  state: (): State => ({
-    lists: {},
-    activeGender: "F",
-    activeSort: "popular",
-    error: null,
-  }),
+  const chunkedItems = computed(() => {
+    const items = currentList.value.items;
+    const chunks: Character[][] = [];
+    const len = items?.length || 0;
+    for (let i = 0; i < len; i += 2) {
+      chunks.push(items.slice(i, i + 2));
+    }
+    return chunks;
+  });
 
-  getters: {
-    currentKey(state): string {
-      return `${state.activeGender}_${state.activeSort}`;
-    },
+  function setGender(gender: GenderFilter) {
+    if (activeGender.value === gender) return;
+    activeGender.value = gender;
+    checkAndLoad();
+  }
 
-    currentList(state): ListState {
-      const key = this.currentKey;
-      if (!state.lists[key]) {
-        state.lists[key] = createEmptyList();
-      }
-      return state.lists[key];
-    },
+  function setSort(sort: SortOption) {
+    if (activeSort.value === sort) return;
+    activeSort.value = sort;
+    checkAndLoad();
+  }
 
-    chunkedItems(): Character[][] {
-      const items = this.currentList.items;
-      const chunks: Character[][] = [];
-      for (let i = 0; i < items.length; i += 2) {
-        chunks.push(items.slice(i, i + 2));
-      }
-      return chunks;
-    },
-  },
+  function checkAndLoad() {
+    if (!currentList.value.isLoaded && !currentList.value.isLoading) {
+      fetchCharacters();
+    }
+  }
 
-  actions: {
-    setGender(gender: GenderFilter) {
-      this.activeGender = gender;
-      this.checkAndLoad();
-    },
+  async function fetchCharacters() {
+    const key = currentKey.value;
+    const list = lists.value[key];
 
-    setSort(sort: SortOption) {
-      this.activeSort = sort;
-      this.checkAndLoad();
-    },
+    if (!list || list.isLoading || (list.isLoaded && !list.nextCursor)) return;
 
-    checkAndLoad() {
-      if (!this.currentList.isLoaded && !this.currentList.isLoading) {
-        this.fetchCharacters();
-      }
-    },
+    list.isLoading = true;
+    error.value = null;
 
-    async fetchCharacters() {
-      const list = this.currentList;
+    try {
+      const response = await getCharacters({
+        gender: activeGender.value,
+        sort: activeSort.value,
+        cursor: list.nextCursor || undefined,
+      });
 
-      if (list.isLoading || (list.isLoaded && !list.nextCursor)) return;
-
-      list.isLoading = true;
-      this.error = null;
-
-      try {
-        const response = await getCharacters({
-          gender: this.activeGender,
-          sort: this.activeSort,
-          cursor: list.nextCursor || undefined,
-        });
-
-        const newItems = response.items.filter((char) => {
-          if (list.ids.has(char.id)) return false;
+      const newItems: Character[] = [];
+      for (const char of response.items) {
+        if (!list.ids.has(char.id)) {
           list.ids.add(char.id);
-          return true;
-        });
-
-        list.items.push(...newItems);
-        list.nextCursor = response.next_cursor;
-        list.isLoaded = true;
-      } catch (e: any) {
-        this.error = "Не удалось загрузить персонажей";
-        console.error(e);
-      } finally {
-        list.isLoading = false;
+          newItems.push(char);
+        }
       }
-    },
-  },
+
+      list.items = [...list.items, ...newItems];
+
+      list.nextCursor = response.next_cursor;
+      list.isLoaded = true;
+
+      triggerRef(lists);
+    } catch (e: any) {
+      error.value = "Не удалось загрузить персонажей";
+      console.error(e);
+    } finally {
+      list.isLoading = false;
+    }
+  }
+
+  return {
+    activeGender,
+    activeSort,
+    error,
+    currentList,
+    chunkedItems,
+    setGender,
+    setSort,
+    fetchCharacters,
+    checkAndLoad,
+  };
 });

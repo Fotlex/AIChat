@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from "vue";
+import { computed, ref, onMounted, watch } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { useCharactersStore } from "@/store/characters";
 import CharacterCard from "./CharacterCard.vue";
@@ -9,23 +9,21 @@ import { useRouter } from "vue-router";
 
 const store = useCharactersStore();
 const router = useRouter();
-
 const parentRef = ref<HTMLElement | null>(null);
-const chunkedItems = computed(() => store.chunkedItems);
+
+const listKey = computed(() => `${store.activeGender}-${store.activeSort}`);
 
 onMounted(() => {
-  if (store.currentList.items.length === 0) {
-    store.fetchCharacters();
-  }
+  store.checkAndLoad();
 });
 
 const rowVirtualizer = useVirtualizer(
   computed(() => ({
-    count: chunkedItems.value.length,
+    count: store.chunkedItems.length,
     getScrollElement: () => parentRef.value,
     estimateSize: () => 260,
-    overscan: 5,
-    scrollMargin: 10,
+    overscan: 4,
+    scrollMargin: 0,
   })),
 );
 
@@ -41,7 +39,7 @@ watch(
   (virtualItems) => {
     if (!virtualItems.length) return;
     const lastItem = virtualItems[virtualItems.length - 1];
-    if (lastItem && lastItem.index >= chunkedItems.value.length - 2) {
+    if (lastItem && lastItem.index >= store.chunkedItems.length - 5) {
       store.fetchCharacters();
     }
   },
@@ -56,6 +54,7 @@ watch(
     </div>
 
     <div
+      :key="listKey"
       class="virtual-sizer"
       :style="{
         height: `${totalSize}px`,
@@ -79,12 +78,12 @@ watch(
         <div class="row-cols">
           <CharacterCard
             class="row-item"
-            :character="chunkedItems[virtualRow.index]?.[0] ?? null"
+            :character="store.chunkedItems[virtualRow.index]?.[0] ?? null"
             @select="handleSelect"
           />
           <CharacterCard
             class="row-item"
-            :character="chunkedItems[virtualRow.index]?.[1] ?? null"
+            :character="store.chunkedItems[virtualRow.index]?.[1] ?? null"
             @select="handleSelect"
           />
         </div>
