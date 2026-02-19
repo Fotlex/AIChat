@@ -9,7 +9,6 @@ import {
 } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import WebApp from "@twa-dev/sdk";
 import { useChatsStore } from "@/store/chats";
 import { useUserStore } from "@/store/user";
 import { useCharactersStore } from "@/store/characters";
@@ -59,23 +58,16 @@ const scrollToBottom = (options?: ScrollToOptions) => {
   }
 };
 
-onMounted(async () => {
-  try {
-    if (WebApp.initData) {
-      WebApp.expand();
-    }
-  } catch (e) {
-    console.warn("WebApp init failed:", e);
+const jumpToBottom = () => {
+  const count = messages.value.length;
+  if (count > 0) {
+    rowVirtualizer.value.scrollToIndex(count - 1, { align: "end" });
   }
+};
 
-  if (!userStore.currentUser) await userStore.fetchUser();
+onMounted(async () => {
   await chatsStore.enterChat(characterId);
-
-  nextTick(() => {
-    if (parentRef.value) {
-      parentRef.value.scrollTop = parentRef.value.scrollHeight;
-    }
-  });
+  requestAnimationFrame(() => jumpToBottom());
 });
 
 watch(
