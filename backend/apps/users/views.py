@@ -1,27 +1,24 @@
-from rest_framework import viewsets
-from rest_framework.decorators import action
-from rest_framework.response import Response
+from config.utils import fast_json
 
 from apps.chat.services import centrifugo_service
-
-from .models import User
-from .serializers import UserSerializer
+from apps.users.auth import twa_auth
 
 
-class UserViewSet(viewsets.GenericViewSet):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+@twa_auth("GET")
+async def current_user_view(request):
+    user = request.user
+    return fast_json(
+        {
+            "telegram_id": user.telegram_id,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "balance": user.balance,
+        }
+    )
 
-    @action(detail=False, methods=["get"], url_path="me")
-    def current_user(self, request):
-        user = request.user
-        serializer = self.get_serializer(user)
-        return Response(serializer.data)
 
-    @action(detail=False, methods=["get"], url_path="ws-token")
-    def get_ws_token(self, request):
-        if not request.user.is_authenticated:
-            return Response({"error": "Unauthorized"}, status=401)
-
-        token = centrifugo_service.get_connection_token(request.user.telegram_id)
-        return Response({"token": token})
+@twa_auth("GET")
+async def get_ws_token_view(request):
+    token = centrifugo_service.get_connection_token(request.user.telegram_id)
+    return fast_json({"token": token})

@@ -32,6 +32,7 @@ export interface Message {
   content: string;
   created_at: string;
   is_pending?: boolean;
+  is_error?: boolean;
 }
 
 export interface Chat {

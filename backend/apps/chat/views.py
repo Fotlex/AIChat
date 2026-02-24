@@ -1,158 +1,122 @@
 import orjson
+from asgiref.sync import sync_to_async
+from config.utils import R400, R404, fast_json
 from django.db import transaction
-from django.http import HttpResponse
 from django.utils import timezone
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.views import APIView
 
-from .models import Chat, Message
-from .tasks import generate_ai_response_task
+from apps.characters.models import Character
+from apps.chat.models import Chat, Message
+from apps.chat.tasks import generate_ai_response_task
+from apps.users.auth import twa_auth
 
 
-class ChatListView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        chats = list(
-            Chat.objects.filter(user_id=request.user.telegram_id).values(
-                "id",
-                "last_message_text",
-                "last_message_at",
-                "character_id",
-                "character__name",
-                "character__photo",
-                "character__description",
-            )
+@twa_auth("GET")
+async def chat_list_view(request):
+    chats = await sync_to_async(list)(
+        Chat.objects.filter(user_id=request.user.telegram_id)
+        .order_by("-last_message_at")
+        .values(
+            "id",
+            "last_message_text",
+            "last_message_at",
+            "character_id",
+            "character__name",
+            "character__photo",
+            "character__description",
         )
-        return HttpResponse(orjson.dumps(chats), content_type="application/json")
+    )
+    return fast_json(chats)
 
 
-class ChatDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+@twa_auth("GET")
+async def chat_detail_view(request, chat_id):
+    if not await Chat.objects.filter(
+        id=chat_id, user_id=request.user.telegram_id
+    ).aexists():
+        return R404
 
-    def get(self, request, chat_id):
-        limit = 30
+    cursor_raw = request.GET.get("cursor")
+    cursor = int(cursor_raw) if cursor_raw and cursor_raw.isdigit() else 0
 
-        query = Message.objects.filter(
-            chat_id=chat_id, chat__user_id=request.user.telegram_id
-        )
+    filters = {"chat_id": chat_id}
+    if cursor > 0:
+        filters["id__lt"] = cursor
 
-        cursor = request.query_params.get("cursor")
-        if cursor:
-            query = query.filter(id__lt=int(cursor))
+    limit = 30
+    messages = await sync_to_async(list)(
+        Message.objects.filter(**filters)
+        .order_by("-id")
+        .values("id", "role", "content", "created_at")[: limit + 1]
+    )
 
-        messages = list(
-            query.order_by("-id")[: limit + 1].values(
-                "id", "role", "content", "created_at"
-            )
-        )
+    next_cursor = None
+    if len(messages) > limit:
+        messages.pop()
+        next_cursor = messages[-1]["id"]
 
-        has_more = len(messages) > limit
-        next_cursor = None
-
-        if has_more:
-            messages.pop()
-            next_cursor = messages[-1]["id"]
-
-        messages.reverse()
-
-        return HttpResponse(
-            orjson.dumps(
-                {
-                    "items": messages,
-                    "next_cursor": next_cursor,
-                }
-            ),
-            content_type="application/json",
-        )
+    return fast_json({"items": messages, "next_cursor": next_cursor})
 
 
-class MessageSendView(APIView):
-    permission_classes = [IsAuthenticated]
+@twa_auth("POST")
+async def message_send_view(request, character_id):
+    try:
+        payload = orjson.loads(request.body)
+    except orjson.JSONDecodeError:
+        return R400
 
-    def post(self, request, character_id):
-        content = request.data.get("content")
-        if not content or not isinstance(content, str):
-            return HttpResponse(
-                orjson.dumps({"error": "Content required"}),
-                status=status.HTTP_400_BAD_REQUEST,
-                content_type="application/json",
-            )
+    content = payload.get("content")
+    if not isinstance(content, str) or not content.strip():
+        return R400
 
-        content = content.strip()[:1000]
-        now = timezone.now()
-        user_id = request.user.telegram_id
+    content = content.strip()[:1000]
 
-        chat_id = (
-            Chat.objects.filter(user_id=user_id, character_id=character_id)
-            .values_list("id", flat=True)
+    result = await sync_to_async(_sync_save_message)(
+        request.user.telegram_id, character_id, content
+    )
+    return fast_json(result, status=201)
+
+
+def _sync_save_message(user_id, character_id, content):
+    now = timezone.now()
+    with transaction.atomic():
+        chat = (
+            Chat.objects.select_for_update()
+            .filter(user_id=user_id, character_id=character_id)
             .first()
         )
 
-        with transaction.atomic():
-            if chat_id:
-                last_msg = Message.objects.create(
-                    chat_id=chat_id,
-                    role=Message.Role.USER,
-                    content=content,
-                    created_at=now,
+        to_create = []
+        created = False
+
+        if not chat:
+            chat, created = Chat.objects.get_or_create(
+                user_id=user_id,
+                character_id=character_id,
+                defaults={"last_message_text": content, "last_message_at": now},
+            )
+
+            if created:
+                welcome = (
+                    Character.objects.filter(id=character_id)
+                    .values_list("welcome_message", flat=True)
+                    .first()
                 )
-            else:
-                chat, created = Chat.objects.get_or_create(
-                    user_id=user_id, character_id=character_id
-                )
-                chat_id = chat.id
-
-                if not created:
-                    last_msg = Message.objects.create(
-                        chat_id=chat_id,
-                        role=Message.Role.USER,
-                        content=content,
-                        created_at=now,
-                    )
-                else:
-                    from apps.characters.models import Character
-
-                    welcome_text = (
-                        Character.objects.filter(id=character_id)
-                        .values_list("welcome_message", flat=True)
-                        .first()
-                    )
-
-                    msgs = []
-                    if welcome_text:
-                        msgs.append(
-                            Message(
-                                chat=chat,
-                                role=Message.Role.ASSISTANT,
-                                content=welcome_text,
-                                created_at=now,
-                            )
-                        )
-
-                    msgs.append(
+                if welcome:
+                    to_create.append(
                         Message(
-                            chat=chat,
-                            role=Message.Role.USER,
-                            content=content,
-                            created_at=now,
+                            chat=chat, role="assistant", content=welcome, created_at=now
                         )
                     )
 
-                    created_msgs = Message.objects.bulk_create(msgs)
-                    last_msg = created_msgs[-1]
+        user_msg = Message(chat=chat, role="user", content=content, created_at=now)
+        to_create.append(user_msg)
+        Message.objects.bulk_create(to_create)
 
-            Chat.objects.filter(id=chat_id).update(
+        if not created:
+            Chat.objects.filter(id=chat.id).update(
                 last_message_text=content, last_message_at=now
             )
 
-            transaction.on_commit(
-                lambda: generate_ai_response_task.delay(chat_id, user_id)
-            )
+        transaction.on_commit(lambda: generate_ai_response_task.delay(chat.id, user_id))
 
-        return HttpResponse(
-            orjson.dumps({"id": last_msg.id, "chat_id": chat_id}),
-            status=status.HTTP_201_CREATED,
-            content_type="application/json",
-        )
+        return {"id": user_msg.id, "chat_id": chat.id}

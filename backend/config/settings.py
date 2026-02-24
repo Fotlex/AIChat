@@ -19,7 +19,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "rest_framework",
     "django_celery_beat",
     "apps.users",
     "apps.characters",
@@ -29,14 +28,14 @@ INSTALLED_APPS = [
     "apps.bot",
 ]
 
-MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",
+MIDDLEWARE = []
+
+ADMIN_MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -66,13 +65,14 @@ DATABASES = {
         "PASSWORD": conf.POSTGRES_PASSWORD,
         "HOST": "pgbouncer",
         "PORT": 6432,
-        "CONN_MAX_AGE": 0,
+        "CONN_MAX_AGE": 60,
         "OPTIONS": {
             "connect_timeout": 5,
         },
         "DISABLE_SERVER_SIDE_CURSORS": True,
     }
 }
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -87,15 +87,6 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
-
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "apps.users.authentication.TWAAuthentication",
-    ],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
-    ],
-}
 
 LANGUAGE_CODE = "ru"
 TIME_ZONE = conf.TIMEZONE

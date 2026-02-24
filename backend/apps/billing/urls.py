@@ -1,8 +1,7 @@
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 
-from .views import TariffViewSet
+from .views import tariff_list_view
 
-router = DefaultRouter()
-router.register(r"tariffs", TariffViewSet, basename="tariffs")
-
-urlpatterns = router.urls
+urlpatterns = [
+    path("", tariff_list_view),
+]

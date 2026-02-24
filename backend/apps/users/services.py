@@ -1,34 +1,23 @@
-import logging
-from typing import Optional
+from django.db import transaction
 
 from .models import User
 
-logger = logging.getLogger(__name__)
 
-
-def process_start_param(new_user: User, start_param: Optional[str]) -> None:
-    if not start_param:
-        return
-
-    if start_param.isdigit():
-        _handle_referral(new_user, int(start_param))
-    else:
-        logger.warning(
-            f"Invalid start_param for user {new_user.telegram_id}: '{start_param}'"
+def get_or_create_user_with_referral(user_data, start_param: str):
+    with transaction.atomic():
+        user, created = User.objects.get_or_create(
+            telegram_id=user_data.id,
+            defaults={
+                "username": user_data.username,
+                "first_name": user_data.first_name,
+                "last_name": user_data.last_name,
+            },
         )
 
+        if created and start_param and start_param.isdigit():
+            referrer_id = int(start_param)
+            if user.pk != referrer_id:
+                if User.objects.filter(pk=referrer_id).exists():
+                    User.objects.filter(pk=user.pk).update(referred_by_id=referrer_id)
 
-def _handle_referral(new_user: User, referrer_id: int) -> None:
-    if new_user.telegram_id == referrer_id:
-        logger.warning(f"User {new_user.telegram_id} tried to refer themselves.")
-        return
-
-    try:
-        referrer = User.objects.get(telegram_id=referrer_id)
-        new_user.referred_by = referrer
-        new_user.save(update_fields=["referred_by"])
-        logger.info(f"User {new_user} was referred by {referrer}")
-    except User.DoesNotExist:
-        logger.warning(
-            f"Referrer with id {referrer_id} not found for user {new_user.telegram_id}"
-        )
+    return user

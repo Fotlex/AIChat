@@ -1,151 +1,190 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
+import { shallowRef, triggerRef, computed } from "vue";
 import apiClient from "@/api/apiClient";
 import type { Message, ChatState } from "@/types";
 import { useCharactersStore } from "./characters";
 
-export const useChatsStore = defineStore("chats", () => {
-  const chatCache = ref<Record<number, ChatState>>({});
+const MAX_CACHE_SIZE = 5;
 
-  const activeCharacterId = ref<number | null>(null);
-  const isSending = ref(false);
-  const isLoadingHistory = ref(false);
+export const useChatsStore = defineStore("chats", () => {
+  const chatCache = shallowRef(new Map<number, ChatState>());
+
+  const lruOrder: number[] = [];
+
+  const activeCharacterId = shallowRef<number | null>(null);
+  const isSending = shallowRef(false);
+  const isLoadingHistory = shallowRef(false);
 
   const activeChatState = computed(() => {
     if (activeCharacterId.value === null) return null;
-    return chatCache.value[activeCharacterId.value] || null;
+    return chatCache.value.get(activeCharacterId.value) || null;
   });
 
-  async function enterChat(characterId: number) {
+  function touchCache(charId: number) {
+    const idx = lruOrder.indexOf(charId);
+    if (idx !== -1) {
+      lruOrder.splice(idx, 1);
+    }
+    lruOrder.push(charId);
+
+    if (lruOrder.length > MAX_CACHE_SIZE) {
+      const toRemove = lruOrder.shift();
+      if (toRemove !== undefined) {
+        chatCache.value.delete(toRemove);
+        triggerRef(chatCache);
+      }
+    }
+  }
+
+  function enterChat(characterId: number) {
     activeCharacterId.value = characterId;
 
-    if (!chatCache.value[characterId]) {
-      const charStore = useCharactersStore();
-      const character = charStore.currentList.items.find(
-        (c) => c.id === characterId,
-      );
-
-      const initialState: ChatState = {
-        characterId,
-        chatId: character?.chat_id || null,
-        messages: [],
-        nextCursor: null,
-        isFullyLoaded: false,
-      };
-
-      if (!initialState.chatId && character?.welcome_message) {
-        initialState.messages = [
-          {
-            id: `welcome_${characterId}`,
-            role: "assistant",
-            content: character.welcome_message,
-            created_at: new Date().toISOString(),
-          },
-        ];
-        initialState.isFullyLoaded = true;
-      }
-
-      chatCache.value[characterId] = initialState;
+    if (chatCache.value.has(characterId)) {
+      touchCache(characterId);
+      return;
     }
 
-    const state = chatCache.value[characterId];
-    if (state.chatId && state.messages.length === 0) {
+    const charStore = useCharactersStore();
+    const character = charStore.currentList.items.find(
+      (c) => c.id === characterId,
+    );
+
+    const initialState: ChatState = {
+      characterId,
+      chatId: character?.chat_id || null,
+      messages: [],
+      nextCursor: null,
+      isFullyLoaded: false,
+    };
+
+    if (!initialState.chatId && character?.welcome_message) {
+      initialState.messages = [
+        {
+          id: `welcome_${characterId}`,
+          role: "assistant",
+          content: character.welcome_message,
+          created_at: new Date().toISOString(),
+        },
+      ];
+      initialState.isFullyLoaded = true;
+    }
+
+    chatCache.value.set(characterId, initialState);
+    touchCache(characterId);
+    triggerRef(chatCache);
+
+    if (initialState.chatId) {
       loadHistory(characterId);
     }
   }
 
   async function loadHistory(charId: number): Promise<boolean> {
-    const state = chatCache.value[charId];
+    const state = chatCache.value.get(charId);
+
     if (
       !state ||
       !state.chatId ||
       state.isFullyLoaded ||
       isLoadingHistory.value
-    )
+    ) {
       return false;
+    }
 
     isLoadingHistory.value = true;
     try {
-      const params = state.nextCursor ? { cursor: state.nextCursor } : {};
       const { data } = await apiClient.get(`/chats/${state.chatId}/messages/`, {
-        params,
+        params: state.nextCursor ? { cursor: state.nextCursor } : {},
       });
 
-      const historyMessages = data.items;
+      if (!data.items.length) {
+        state.isFullyLoaded = true;
+        return false;
+      }
 
-      state.messages = [...historyMessages, ...state.messages];
+      state.messages = data.items.concat(state.messages);
       state.nextCursor = data.next_cursor;
 
       if (!data.next_cursor) {
         state.isFullyLoaded = true;
       }
 
+      triggerRef(chatCache);
       return true;
     } catch (e) {
-      console.error(e);
       return false;
     } finally {
       isLoadingHistory.value = false;
     }
   }
 
-  async function sendMessage(content: string) {
-    const charId = activeCharacterId.value;
-    if (!charId || !content.trim()) return;
-
-    const state = chatCache.value[charId];
-    if (!state) return;
-
-    isSending.value = true;
-    const tempId = `temp_${Date.now()}`;
-
-    const userMsg: Message = {
-      id: tempId,
-      role: "user",
-      content,
-      created_at: new Date().toISOString(),
-      is_pending: true,
-    };
-
-    state.messages = [...state.messages, userMsg];
+  async function performSend(msg: Message, state: ChatState) {
+    msg.is_pending = true;
+    msg.is_error = false;
+    triggerRef(chatCache);
 
     try {
       const { data } = await apiClient.post<{ id: number; chat_id: number }>(
-        `/chats/character/${charId}/send/`,
-        { content },
+        `/chats/character/${state.characterId}/send/`,
+        { content: msg.content },
       );
 
-      const idx = state.messages.findIndex((m) => m.id === tempId);
-      if (idx !== -1) {
-        const newMsgs = [...state.messages];
-        newMsgs[idx] = { ...userMsg, id: data.id, is_pending: false };
-        state.messages = newMsgs;
-      }
+      msg.id = data.id;
+      msg.is_pending = false;
 
       if (!state.chatId) {
         state.chatId = data.chat_id;
         const charStore = useCharactersStore();
-        const char = charStore.currentList.items.find((c) => c.id === charId);
+        const char = charStore.currentList.items.find(c => c.id === state.characterId);
         if (char) char.chat_id = data.chat_id;
       }
-    } catch (e) {
-      state.messages = state.messages.filter((m) => m.id !== tempId);
-      console.error("Send failed", e);
+    } catch {
+      msg.is_error = true;
+      msg.is_pending = false;
     } finally {
-      isSending.value = false;
+      triggerRef(chatCache);
     }
+  }
+
+  async function sendMessage(content: string) {
+    const state = activeChatState.value;
+    if (!state || !content.trim()) return;
+
+    const userMsg: Message = {
+      id: `temp_${Date.now()}`,
+      role: "user",
+      content,
+      created_at: new Date().toISOString(),
+      is_pending: true,
+      is_error: false,
+    };
+
+    state.messages.push(userMsg);
+    await performSend(userMsg, state);
+  }
+
+  async function retryMessage(msg: Message) {
+    const state = activeChatState.value;
+    if (!state) return;
+
+    await performSend(msg, state);
   }
 
   function handleIncomingMessage(payload: {
     chat_id: number;
     message: Message;
   }) {
-    for (const charId in chatCache.value) {
-      const state = chatCache.value[charId];
-      if (state && state.chatId === payload.chat_id) {
-        if (state.messages.some((m) => m.id === payload.message.id)) return;
-        state.messages = [...state.messages, payload.message];
-        break;
+    for (const state of chatCache.value.values()) {
+      if (state.chatId === payload.chat_id) {
+        const isDuplicate = state.messages
+          .slice(-5)
+          .some((m) => m.id === payload.message.id);
+        if (isDuplicate) return;
+
+        state.messages.push(payload.message);
+
+        touchCache(state.characterId);
+        triggerRef(chatCache);
+        return;
       }
     }
   }
@@ -156,6 +195,7 @@ export const useChatsStore = defineStore("chats", () => {
     isSending,
     enterChat,
     sendMessage,
+    retryMessage,
     loadHistory,
     handleIncomingMessage,
   };

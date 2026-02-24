@@ -1,8 +1,8 @@
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 
-from .views import UserViewSet
+from .views import current_user_view, get_ws_token_view
 
-router = DefaultRouter()
-router.register(r"users", UserViewSet, basename="user")
-
-urlpatterns = router.urls
+urlpatterns = [
+    path("me/", current_user_view),
+    path("ws-token/", get_ws_token_view),
+]

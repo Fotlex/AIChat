@@ -1,12 +1,5 @@
 <script setup lang="ts">
-import {
-  ref,
-  onMounted,
-  computed,
-  watch,
-  nextTick,
-  type ComponentPublicInstance,
-} from "vue";
+import { ref, onMounted, computed, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { useChatsStore } from "@/store/chats";
@@ -35,39 +28,30 @@ const rowVirtualizer = useVirtualizer(
   computed(() => ({
     count: messages.value.length,
     getScrollElement: () => parentRef.value,
-    estimateSize: () => 80,
-    overscan: 5,
+    estimateSize: () => 70,
+    overscan: 10,
     getItemKey: (index) => messages.value[index]?.id ?? index,
+    initialOffset: 0,
   })),
 );
 
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
 
-const measureElementRef = (el: Element | ComponentPublicInstance | null) => {
-  if (!el) return;
-  rowVirtualizer.value.measureElement(el as Element);
+const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
+  if (!parentRef.value) return;
+  parentRef.value.scrollTo({
+    top: parentRef.value.scrollHeight,
+    behavior,
+  });
 };
 
-const scrollToBottom = (options?: ScrollToOptions) => {
-  if (parentRef.value) {
-    parentRef.value.scrollTo({
-      top: parentRef.value.scrollHeight,
-      ...options,
-    });
-  }
-};
+onMounted(() => {
+  chatsStore.enterChat(characterId);
 
-const jumpToBottom = () => {
-  const count = messages.value.length;
-  if (count > 0) {
-    rowVirtualizer.value.scrollToIndex(count - 1, { align: "end" });
-  }
-};
-
-onMounted(async () => {
-  await chatsStore.enterChat(characterId);
-  requestAnimationFrame(() => jumpToBottom());
+  nextTick(() => {
+    scrollToBottom("auto");
+  });
 });
 
 watch(
@@ -76,43 +60,36 @@ watch(
     if (newLen === 0) return;
 
     if (oldLen === 0) {
-      nextTick(() => {
-        scrollToBottom({ behavior: "auto" });
-      });
+      nextTick(() => scrollToBottom("auto"));
       return;
     }
 
-    if (!chatsStore.isLoadingHistory && newLen > oldLen) {
-      nextTick(() => {
-        scrollToBottom({ behavior: "smooth" });
-      });
+    if (!chatsStore.isLoadingHistory) {
+      nextTick(() => scrollToBottom("smooth"));
     }
   },
   { flush: "post" },
 );
 
-const handleScroll = async (e: Event) => {
+const handleScroll = (e: Event) => {
   const el = e.target as HTMLElement;
 
   if (
-    el.scrollTop < 50 &&
+    el.scrollTop < 100 &&
     !chatsStore.isLoadingHistory &&
-    chatState.value?.nextCursor &&
-    chatState.value?.chatId
+    chatState.value?.nextCursor
   ) {
-    const oldScrollHeight = el.scrollHeight;
-    const oldScrollTop = el.scrollTop;
+    const oldHeight = el.scrollHeight;
+    const oldTop = el.scrollTop;
 
-    const hasNewData = await chatsStore.loadHistory(characterId);
-
-    if (hasNewData) {
-      await nextTick();
-
-      const newScrollHeight = el.scrollHeight;
-      const heightDifference = newScrollHeight - oldScrollHeight;
-
-      el.scrollTop = oldScrollTop + heightDifference;
-    }
+    chatsStore.loadHistory(characterId).then((hasNew) => {
+      if (hasNew) {
+        nextTick(() => {
+          const newHeight = el.scrollHeight;
+          el.scrollTop = oldTop + (newHeight - oldHeight);
+        });
+      }
+    });
   }
 };
 
@@ -121,21 +98,17 @@ const sendMessage = async () => {
   const text = messageInput.value;
   messageInput.value = "";
 
-  if (parentRef.value) {
-    parentRef.value.scrollTo({
-      top: parentRef.value.scrollHeight,
-      behavior: "smooth",
-    });
-  }
+  scrollToBottom("smooth");
 
   await chatsStore.sendMessage(text);
 };
 
+const retry = (msg: Message) => {
+  chatsStore.retryMessage(msg);
+};
+
 const formatTime = (iso: string) => {
-  return new Date(iso).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 };
 </script>
 
@@ -152,21 +125,13 @@ const formatTime = (iso: string) => {
         class="virtual-sizer"
         :style="{
           height: `${totalSize}px`,
-          width: '100%',
-          position: 'relative',
         }"
       >
         <div
           v-for="virtualRow in virtualRows"
-          :key="virtualRow.key.toString()"
-          :data-index="virtualRow.index"
-          :ref="measureElementRef"
+          :key="virtualRow.key"
           class="virtual-row-wrapper"
           :style="{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
             transform: `translateY(${virtualRow.start}px)`,
           }"
         >
@@ -174,20 +139,26 @@ const formatTime = (iso: string) => {
             v-if="messages[virtualRow.index]"
             class="message-row"
             :class="{
-              'row-user': messages[virtualRow.index]!.role === 'user',
-              'row-assistant': messages[virtualRow.index]!.role === 'assistant',
+              'row-user': messages[virtualRow.index].role === 'user',
+              'row-assistant': messages[virtualRow.index].role === 'assistant',
             }"
           >
             <div class="bubble">
               <div class="bubble-text">
-                {{ messages[virtualRow.index]!.content }}
+                {{ messages[virtualRow.index].content }}
               </div>
               <div class="bubble-meta">
-                {{ formatTime(messages[virtualRow.index]!.created_at) }}
+                {{ formatTime(messages[virtualRow.index].created_at) }}
                 <span
-                  v-if="messages[virtualRow.index]!.is_pending"
-                  class="pending-icon"
+                  v-if="messages[virtualRow.index].is_pending"
+                  class="status-icon pending"
                   >🕒</span
+                >
+                <span
+                  v-else-if="messages[virtualRow.index].is_error"
+                  class="status-icon error"
+                  @click="retry(messages[virtualRow.index])"
+                  >⚠️</span
                 >
               </div>
             </div>
@@ -222,29 +193,41 @@ const formatTime = (iso: string) => {
 </template>
 
 <style scoped>
-.messages-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 12px;
-  -webkit-overflow-scrolling: touch;
-  padding-top: calc(60px + env(safe-area-inset-top));
-  overflow-anchor: none;
-}
-
 .chat-layout {
   display: flex;
   flex-direction: column;
   height: 100vh;
   background: #0e0e10;
+  /* GPU acceleration hack for layout */
+  transform: translateZ(0);
+}
+
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  /* Для iOS инерционный скролл */
+  -webkit-overflow-scrolling: touch;
+  padding: 0 12px;
+  padding-top: calc(60px + env(safe-area-inset-top));
+  /* Важно для производительности скролла */
+  contain: strict;
+  will-change: scroll-position;
 }
 
 .virtual-sizer {
   width: 100%;
+  position: relative;
 }
 
 .virtual-row-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
   padding: 4px 0;
   box-sizing: border-box;
+  /* Важно для Virtualizer, чтобы не прыгало */
+  will-change: transform;
 }
 
 .message-row {
@@ -269,6 +252,8 @@ const formatTime = (iso: string) => {
   word-wrap: break-word;
   white-space: pre-wrap;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  /* Оптимизация текста */
+  text-rendering: optimizeLegibility;
 }
 
 .row-user .bubble {
@@ -345,7 +330,7 @@ const formatTime = (iso: string) => {
 
 .history-loader {
   position: absolute;
-  top: 60px;
+  top: 60px; /* Сразу под хедером */
   left: 0;
   width: 100%;
   display: flex;
@@ -362,6 +347,31 @@ const formatTime = (iso: string) => {
   border-top-color: #7b61ff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+
+.status-icon {
+  font-size: 10px;
+  margin-left: 4px;
+}
+.pending {
+  animation: pulse 1.5s infinite;
+  opacity: 0.6;
+}
+.error {
+  color: #ff4d4d;
+  cursor: pointer;
+  opacity: 1;
+}
+@keyframes pulse {
+  0% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.3;
+  }
 }
 
 @keyframes spin {

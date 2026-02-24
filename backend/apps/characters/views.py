@@ -1,45 +1,43 @@
 import base64
+import binascii
 
 import orjson
-from django.db import transaction
+from asgiref.sync import sync_to_async
+from config.utils import R204, R400, fast_json
 from django.db.models import Exists, F, IntegerField, OuterRef, Q, Subquery
-from django.http import HttpResponse
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.views import APIView
 
 from apps.chat.models import Chat
+from apps.users.auth import twa_auth
 
 from .models import Character, CharacterLike
 
+SORT_CONFIG = {
+    "recent": ("id",),
+    "popular": ("likes_count", "id"),
+}
 
-class CharacterListView(APIView):
-    permission_classes = [IsAuthenticated]
 
-    SORT_CONFIG = {
-        "recent": ("id",),
-        "popular": ("likes_count", "id"),
-    }
+@twa_auth("GET")
+async def character_list_view(request):
+    params = request.GET
+    limit = 30
+    user_id = request.user.telegram_id
 
-    def get(self, request):
-        params = request.query_params
-        limit = 30
-
-        user = request.user
+    def get_characters_sync():
         queryset = Character.objects.filter(is_active=True)
 
         is_yours = params.get("yours")
         if is_yours == "1":
-            queryset = queryset.filter(creator_id=user.telegram_id)
+            queryset = queryset.filter(creator_id=user_id)
         elif is_yours == "0":
-            queryset = queryset.exclude(creator_id=user.telegram_id)
+            queryset = queryset.exclude(creator_id=user_id)
 
         gender = params.get("gender")
         if gender in ("M", "F"):
             queryset = queryset.filter(gender=gender)
 
         sort_key = params.get("sort", "recent")
-        sort_fields = self.SORT_CONFIG.get(sort_key, self.SORT_CONFIG["recent"])
+        sort_fields = SORT_CONFIG.get(sort_key, SORT_CONFIG["recent"])
 
         cursor_raw = params.get("cursor")
         if cursor_raw:
@@ -53,25 +51,25 @@ class CharacterListView(APIView):
                             q_part &= Q(**{sort_fields[j]: cv[j]})
                         pagination_filter |= q_part
                     queryset = queryset.filter(pagination_filter)
-            except Exception:
+            except (ValueError, TypeError, binascii.Error, orjson.JSONDecodeError):
                 pass
 
         chat_id_subquery = Chat.objects.filter(
-            user=user, character=OuterRef("pk")
+            user_id=user_id, character=OuterRef("pk")
         ).values("id")[:1]
 
         is_liked_exists = CharacterLike.objects.filter(
-            user=user, character=OuterRef("pk")
+            user_id=user_id, character=OuterRef("pk")
         )
 
         queryset = queryset.annotate(
             chat_id=Subquery(chat_id_subquery, output_field=IntegerField()),
-            is_liked=Exists(is_liked_exists)
+            is_liked=Exists(is_liked_exists),
         )
 
         order_by = [f"-{f}" for f in sort_fields]
 
-        characters = list(
+        return list(
             queryset.order_by(*order_by)[: limit + 1].values(
                 "id",
                 "name",
@@ -84,61 +82,50 @@ class CharacterListView(APIView):
                 "is_liked",
                 *sort_fields,
             )
-        )
+        ), sort_fields
 
-        has_more = len(characters) > limit
-        next_cursor = None
+    characters, sort_fields = await sync_to_async(get_characters_sync)()
 
-        if has_more:
-            characters.pop()
-            last_item = characters[-1]
-            next_vals = [last_item[f] for f in sort_fields]
-            next_cursor = base64.b64encode(orjson.dumps(next_vals)).decode()
+    has_more = len(characters) > limit
+    next_cursor = None
 
-        for char in characters:
-            if char["photo"]:
-                char["photo"] = f"/media/{char['photo']}"
+    if has_more:
+        characters.pop()
+        last_item = characters[-1]
+        next_vals = [last_item[f] for f in sort_fields]
+        next_cursor = base64.b64encode(orjson.dumps(next_vals)).decode()
 
-        return HttpResponse(
-            orjson.dumps(
-                {
-                    "items": characters,
-                    "next_cursor": next_cursor,
-                }
-            ),
-            content_type="application/json",
-        )
+    return fast_json({"items": characters, "next_cursor": next_cursor})
 
 
-class CharacterLikeView(APIView):
-    permission_classes = [IsAuthenticated]
+@twa_auth("POST")
+async def character_like_view(request, pk):
+    try:
+        payload = orjson.loads(request.body)
+    except orjson.JSONDecodeError:
+        return R400
 
-    def post(self, request, pk):
-        user = request.user
-        wanted_active = request.data.get("active")
+    wanted_active = payload.get("active")
+    if wanted_active is None:
+        return R400
 
-        if wanted_active is None:
-            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+    user_id = request.user.telegram_id
 
-        with transaction.atomic():
-            if wanted_active:
-                _, created = CharacterLike.objects.get_or_create(
-                    user=user, character_id=pk
+    def toggle_like_sync():
+        if wanted_active:
+            _, created = CharacterLike.objects.get_or_create(
+                user_id=user_id, character_id=pk
+            )
+            if created:
+                Character.objects.filter(pk=pk).update(likes_count=F("likes_count") + 1)
+        else:
+            deleted_count, _ = CharacterLike.objects.filter(
+                user_id=user_id, character_id=pk
+            ).delete()
+            if deleted_count > 0:
+                Character.objects.filter(pk=pk, likes_count__gt=0).update(
+                    likes_count=F("likes_count") - 1
                 )
 
-                if created:
-                    Character.objects.filter(pk=pk).update(
-                        likes_count=F("likes_count") + 1
-                    )
-
-            else:
-                deleted_count, _ = CharacterLike.objects.filter(
-                    user=user, character_id=pk
-                ).delete()
-
-                if deleted_count > 0:
-                    Character.objects.filter(pk=pk, likes_count__gt=0).update(
-                        likes_count=F("likes_count") - 1
-                    )
-
-        return HttpResponse(status=status.HTTP_204_NO_CONTENT)
+    await sync_to_async(toggle_like_sync)()
+    return R204
