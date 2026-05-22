@@ -19,18 +19,10 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django_celery_beat",
-    "apps.users",
-    "apps.characters",
-    "apps.chat",
-    "apps.content",
-    "apps.billing",
-    "apps.bot",
+    "apps.core",
 ]
 
-MIDDLEWARE = []
-
-ADMIN_MIDDLEWARE = [
+MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -55,21 +47,23 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "config.wsgi.application"
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": conf.POSTGRES_DB,
         "USER": conf.POSTGRES_USER,
         "PASSWORD": conf.POSTGRES_PASSWORD,
-        "HOST": "pgbouncer",
-        "PORT": 6432,
-        "CONN_MAX_AGE": 60,
+        "HOST": conf.POSTGRES_HOST,
+        "PORT": conf.POSTGRES_PORT,
+        "CONN_MAX_AGE": 0,
         "OPTIONS": {
             "connect_timeout": 5,
+            "pool": {
+                "min_size": 2,
+                "max_size": 15,
+                "timeout": 10,
+            },
         },
-        "DISABLE_SERVER_SIDE_CURSORS": True,
     }
 }
 
@@ -100,43 +94,12 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CELERY_BROKER_URL = conf.CELERY_BROKER_URL
-CELERY_RESULT_BACKEND = conf.CELERY_RESULT_BACKEND_URL
-CELERY_TASK_IGNORE_RESULT = True
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = TIME_ZONE
-CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
-
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": conf.CACHE_URL,
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        },
-    }
-}
-
-WEBAPP_URL = conf.WEBAPP_URL
-BOT_TOKEN = conf.BOT_TOKEN
-BOT_WEBHOOK_SECRET = conf.BOT_WEBHOOK_SECRET
-
-FSM_URL = conf.FSM_URL
-
-CENTRIFUGO_API_URL = conf.CENTRIFUGO_API_URL
-CENTRIFUGO_API_KEY = conf.CENTRIFUGO_API_KEY
-CENTRIFUGO_HMAC_SECRET = conf.CENTRIFUGO_HMAC_SECRET
-
 ADMIN_SITE_HEADER = conf.ADMIN_SITE_HEADER
 ADMIN_SITE_TITLE = conf.ADMIN_SITE_TITLE
 ADMIN_INDEX_TITLE = conf.ADMIN_INDEX_TITLE
 ADMIN_REORDER = [
-    {"label": "👥 Пользователи", "models": ["users"]},
-    {"label": "🎭 Персонажи", "models": ["characters"]},
-    {"label": "💬 Чаты и Сообщения", "models": ["chat"]},
-    {"label": "💎 Платежи и Тарифы", "models": ["billing"]},
-    {"label": "⚙️ Контент бота", "models": ["content"]},
-    {"label": "⏱️ Планировщик", "models": ["django_celery_beat"]},
+    {"label": "👥 Пользователи", "models": ["core.User"]},
+    {"label": "🎭 Персонажи", "models": ["core.Character"]},
+    {"label": "💬 Чаты и Сообщения", "models": ["core.Conversation", "core.Message"]},
+    {"label": "⚙️ Настройки LLM", "models": ["core.LLMConfiguration"]},
 ]

@@ -12,84 +12,13 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: aichat-redis
-    command: redis-server --appendonly yes
-    volumes:
-      - redis-data:/data
-    env_file:
-      - ../.env
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 1s
-      timeout: 3s
-      retries: 5
-
-  pgbouncer:
-    image: edoburu/pgbouncer:v1.25.1-p0
-    container_name: aichat-pgbouncer
-    env_file:
-      - ./pgbouncer/pgbouncer.env
-    environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      - ADMIN_USERS=${POSTGRES_USER}
-    ulimits:
-      nofile:
-        soft: 10000
-        hard: 10000
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-        reservations:
-          memory: 32M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    depends_on:
-      db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -p 6432 -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 2s
-      start_interval: 1s
-
-  centrifugo:
-    image: centrifugo/centrifugo:v6.6.0
-    container_name: aichat-centrifugo
-    volumes:
-      - ./centrifugo/config.json:/centrifugo/config.json
-    command: centrifugo -c /centrifugo/config.json
-    ulimits:
-      nofile:
-        soft: 65535
-        hard: 65535
-    environment:
-      - CENTRIFUGO_HTTP_API_KEY=${CENTRIFUGO_API_KEY}
-      - CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY=${CENTRIFUGO_HMAC_SECRET}
-      - CENTRIFUGO_CLIENT_ALLOWED_ORIGINS=${CENTRIFUGO_ORIGINS}
-    depends_on:
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "centrifugo", "check"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   backend:
     build:
       context: ../backend
       dockerfile: Dockerfile
       target: dev
     container_name: aichat-backend
-    command: granian --interface asgi --host 0.0.0.0 --port 8000 --reload config.asgi:application
+    command: granian --interface asgi --host 0.0.0.0 --port 8000 config.asgi:application
     volumes:
       - ../backend:/app
       - static-volume:/app/static_root
@@ -100,45 +29,6 @@ services:
       - ../.env
     depends_on:
       db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  celery-worker:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
-      target: dev
-    container_name: aichat-celery-worker
-    command: celery -A config worker -l INFO -P gevent -c 100
-    volumes:
-      - ../backend:/app
-      - media-volume:/app/media
-    env_file:
-      - ../.env
-    environment:
-      - CELERY_POOL_CLASS=gevent
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  celery-beat:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
-      target: dev
-    container_name: aichat-celery-beat
-    command: celery -A config beat -l INFO
-    volumes:
-      - ../backend:/app
-    env_file:
-      - ../.env
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
         condition: service_healthy
 
   frontend:
