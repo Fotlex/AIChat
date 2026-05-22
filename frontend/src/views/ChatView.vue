@@ -226,7 +226,6 @@ const formatTime = (iso: string) => {
   width: 100%;
   padding: 4px 0;
   box-sizing: border-box;
-  /* Важно для Virtualizer, чтобы не прыгало */
   will-change: transform;
 }
 

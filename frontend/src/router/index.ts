@@ -1,9 +1,16 @@
 import { createRouter, createWebHistory } from "vue-router";
 import CharactersView from "@/views/CharactersView.vue";
+import LoginView from "@/views/LoginView.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    {
+      path: "/login",
+      name: "login",
+      component: LoginView,
+      meta: { layout: "BlankLayout" },
+    },
     {
       path: "/",
       name: "characters",
@@ -41,6 +48,17 @@ const router = createRouter({
       meta: { layout: "BlankLayout" },
     },
   ],
+});
+
+router.beforeEach((to) => {
+  const isAuthenticated = !!localStorage.getItem("access_token");
+
+  if (to.name !== "login" && !isAuthenticated) {
+    return { name: "login" };
+  }
+  if (to.name === "login" && isAuthenticated) {
+    return { name: "characters" };
+  }
 });
 
 export default router;

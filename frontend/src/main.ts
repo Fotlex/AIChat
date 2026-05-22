@@ -5,9 +5,6 @@ import App from "./App.vue";
 
 import router from "./router";
 import { createPinia } from "pinia";
-import WebApp from "@twa-dev/sdk";
-
-WebApp.ready();
 
 const app = createApp(App);
 const pinia = createPinia();
