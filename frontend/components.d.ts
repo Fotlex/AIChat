@@ -25,5 +25,6 @@ declare module 'vue' {
     TariffCard: typeof import('./src/components/TariffCard.vue')['default']
     TopNav: typeof import('./src/components/TopNav.vue')['default']
     VirtualCharacterGrid: typeof import('./src/components/VirtualCharacterGrid.vue')['default']
+    VirtualChatList: typeof import('./src/components/VirtualChatList.vue')['default']
   }
 }

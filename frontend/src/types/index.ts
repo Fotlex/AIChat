@@ -6,7 +6,7 @@ export interface Character {
   photo: string | null;
   creator: number | null;
   likes_count: number;
-  welcome_message: string | null;
+  greeting_message: string | null;
   chat_id: number | null;
 }
 

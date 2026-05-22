@@ -4,6 +4,7 @@ from functools import wraps
 import jwt
 from config.utils import R401, R405
 from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,7 @@ def jwt_auth(methods=None):
         methods = ["GET"]
 
     def decorator(view_func):
+        @csrf_exempt
         @wraps(view_func)
         async def _wrapped(request, *args, **kwargs):
             if request.method not in methods:

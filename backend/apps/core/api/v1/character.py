@@ -16,12 +16,16 @@ SORT_CONFIG = {
 @jwt_auth(methods=["GET"])
 async def character_list_view(request):
     sort_key = request.GET.get("sort", "popular")
+    gender = request.GET.get("gender")
     cursor_raw = request.GET.get("cursor")
     limit = 30
 
     sort_fields = SORT_CONFIG.get(sort_key, SORT_CONFIG["popular"])
 
     qs = Character.objects.filter(is_public=True)
+
+    if gender in ("M", "F"):
+        qs = qs.filter(gender=gender)
 
     if cursor_raw:
         try:
@@ -42,7 +46,7 @@ async def character_list_view(request):
             "id",
             "name",
             "tagline",
-            "system_prompt",
+            "greeting_message",
             likes_count=F("interaction_count"),
             photo=F("avatar"),
         )[: limit + 1]

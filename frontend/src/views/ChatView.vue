@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import type { Message } from "@/types";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { useChatsStore } from "@/store/chats";
 import { useUserStore } from "@/store/user";
@@ -22,7 +23,12 @@ const character = computed(
 );
 
 const chatState = computed(() => chatsStore.activeChatState);
-const messages = computed(() => chatState.value?.messages || []);
+
+const messages = computed(() => {
+  if (chatsStore.activeCharacterId === null) return [];
+  const state = chatsStore.chatCache.get(chatsStore.activeCharacterId);
+  return state ? state.messages : [];
+});
 
 const rowVirtualizer = useVirtualizer(
   computed(() => ({
@@ -46,8 +52,8 @@ const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
   });
 };
 
-onMounted(() => {
-  chatsStore.enterChat(characterId);
+onMounted(async () => {
+  await chatsStore.enterChat(characterId);
 
   nextTick(() => {
     scrollToBottom("auto");
@@ -108,7 +114,10 @@ const retry = (msg: Message) => {
 };
 
 const formatTime = (iso: string) => {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 </script>
 
@@ -129,7 +138,7 @@ const formatTime = (iso: string) => {
       >
         <div
           v-for="virtualRow in virtualRows"
-          :key="virtualRow.key"
+          :key="virtualRow.key.toString()"
           class="virtual-row-wrapper"
           :style="{
             transform: `translateY(${virtualRow.start}px)`,
@@ -139,25 +148,25 @@ const formatTime = (iso: string) => {
             v-if="messages[virtualRow.index]"
             class="message-row"
             :class="{
-              'row-user': messages[virtualRow.index].role === 'user',
-              'row-assistant': messages[virtualRow.index].role === 'assistant',
+              'row-user': messages[virtualRow.index]!.role === 'user',
+              'row-assistant': messages[virtualRow.index]!.role === 'assistant',
             }"
           >
             <div class="bubble">
               <div class="bubble-text">
-                {{ messages[virtualRow.index].content }}
+                {{ messages[virtualRow.index]!.content }}
               </div>
               <div class="bubble-meta">
-                {{ formatTime(messages[virtualRow.index].created_at) }}
+                {{ formatTime(messages[virtualRow.index]!.created_at) }}
                 <span
-                  v-if="messages[virtualRow.index].is_pending"
+                  v-if="messages[virtualRow.index]!.is_pending"
                   class="status-icon pending"
                   >🕒</span
                 >
                 <span
-                  v-else-if="messages[virtualRow.index].is_error"
+                  v-else-if="messages[virtualRow.index]!.is_error"
                   class="status-icon error"
-                  @click="retry(messages[virtualRow.index])"
+                  @click="retry(messages[virtualRow.index]!)"
                   >⚠️</span
                 >
               </div>
@@ -198,18 +207,15 @@ const formatTime = (iso: string) => {
   flex-direction: column;
   height: 100vh;
   background: #0e0e10;
-  /* GPU acceleration hack for layout */
   transform: translateZ(0);
 }
 
 .messages-container {
   flex: 1;
   overflow-y: auto;
-  /* Для iOS инерционный скролл */
   -webkit-overflow-scrolling: touch;
   padding: 0 12px;
   padding-top: calc(60px + env(safe-area-inset-top));
-  /* Важно для производительности скролла */
   contain: strict;
   will-change: scroll-position;
 }
@@ -251,7 +257,6 @@ const formatTime = (iso: string) => {
   word-wrap: break-word;
   white-space: pre-wrap;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  /* Оптимизация текста */
   text-rendering: optimizeLegibility;
 }
 
@@ -329,7 +334,7 @@ const formatTime = (iso: string) => {
 
 .history-loader {
   position: absolute;
-  top: 60px; /* Сразу под хедером */
+  top: 60px;
   left: 0;
   width: 100%;
   display: flex;

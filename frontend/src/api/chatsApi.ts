@@ -1,23 +1,8 @@
 import apiClient from "./apiClient";
-import type { Chat, Message, PaginatedResponse } from "@/types";
+import type { Chat, PaginatedResponse } from "@/types";
 
-export const getChats = async (): Promise<Chat[]> => {
-  const response = await apiClient.get<Chat[]>("/chats/");
-  return response.data;
-};
-
-export const getOrCreateChatWithMessages = async (
-  characterId: number
-): Promise<PaginatedResponse<any> & { chat: Chat }> => {
-  const response = await apiClient.get<PaginatedResponse<any> & { chat: Chat }>(
-    `/chats/character/${characterId}/`
-  );
-  return response.data;
-};
-
-export const getMessagesByUrl = async (
-  url: string
-): Promise<PaginatedResponse<Message[]>> => {
-  const response = await apiClient.get<PaginatedResponse<Message[]>>(url);
+export const getChats = async (cursor?: string | null): Promise<PaginatedResponse<Chat>> => {
+  const params = cursor ? { cursor } : {};
+  const response = await apiClient.get<PaginatedResponse<Chat>>("/chats/", { params });
   return response.data;
 };

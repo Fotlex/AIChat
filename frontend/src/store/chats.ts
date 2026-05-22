@@ -1,14 +1,19 @@
 import { defineStore } from "pinia";
-import { shallowRef, triggerRef, computed } from "vue";
+import { shallowRef, triggerRef, computed, ref } from "vue";
 import apiClient from "@/api/apiClient";
-import type { Message, ChatState } from "@/types";
+import type { Message, ChatState, Chat } from "@/types";
 import { useCharactersStore } from "./characters";
+import { getChats } from "@/api/chatsApi";
 
 const MAX_CACHE_SIZE = 5;
 
 export const useChatsStore = defineStore("chats", () => {
-  const chatCache = shallowRef(new Map<number, ChatState>());
+  const chatsList = ref<Chat[]>([]);
+  const chatsNextCursor = ref<string | null>(null);
+  const isChatsLoading = ref(false);
+  const isChatsLoaded = ref(false);
 
+  const chatCache = shallowRef(new Map<number, ChatState>());
   const lruOrder: number[] = [];
 
   const activeCharacterId = shallowRef<number | null>(null);
@@ -20,13 +25,29 @@ export const useChatsStore = defineStore("chats", () => {
     return chatCache.value.get(activeCharacterId.value) || null;
   });
 
+  async function fetchChatsList(loadMore = false) {
+    if (isChatsLoading.value) return;
+    if (loadMore && !chatsNextCursor.value) return;
+
+    isChatsLoading.value = true;
+    try {
+      const data = await getChats(loadMore ? chatsNextCursor.value : null);
+      if (loadMore) {
+        chatsList.value.push(...data.items);
+      } else {
+        chatsList.value = data.items;
+      }
+      chatsNextCursor.value = data.next_cursor;
+      isChatsLoaded.value = true;
+    } finally {
+      isChatsLoading.value = false;
+    }
+  }
+
   function touchCache(charId: number) {
     const idx = lruOrder.indexOf(charId);
-    if (idx !== -1) {
-      lruOrder.splice(idx, 1);
-    }
+    if (idx !== -1) lruOrder.splice(idx, 1);
     lruOrder.push(charId);
-
     if (lruOrder.length > MAX_CACHE_SIZE) {
       const toRemove = lruOrder.shift();
       if (toRemove !== undefined) {
@@ -36,7 +57,7 @@ export const useChatsStore = defineStore("chats", () => {
     }
   }
 
-  function enterChat(characterId: number) {
+  async function enterChat(characterId: number) {
     activeCharacterId.value = characterId;
 
     if (chatCache.value.has(characterId)) {
@@ -44,25 +65,44 @@ export const useChatsStore = defineStore("chats", () => {
       return;
     }
 
+    if (chatsList.value.length === 0 && !isChatsLoaded.value) {
+      await fetchChatsList();
+    }
+
     const charStore = useCharactersStore();
-    const character = charStore.currentList.items.find(
+    if (charStore.currentList.items.length === 0) {
+      await charStore.fetchCharacters();
+    }
+
+    let character = charStore.currentList.items.find(
       (c) => c.id === characterId,
     );
+    let chatId = character?.chat_id || null;
+
+    if (!chatId) {
+      const existingChat = chatsList.value.find(
+        (c) => c.character.id === characterId,
+      );
+      if (existingChat) {
+        chatId = existingChat.id;
+        if (!character) character = existingChat.character;
+      }
+    }
 
     const initialState: ChatState = {
       characterId,
-      chatId: character?.chat_id || null,
+      chatId,
       messages: [],
       nextCursor: null,
       isFullyLoaded: false,
     };
 
-    if (!initialState.chatId && character?.welcome_message) {
+    if (!initialState.chatId && character?.greeting_message) {
       initialState.messages = [
         {
           id: `welcome_${characterId}`,
           role: "assistant",
-          content: character.welcome_message,
+          content: character.greeting_message,
           created_at: new Date().toISOString(),
         },
       ];
@@ -74,21 +114,19 @@ export const useChatsStore = defineStore("chats", () => {
     triggerRef(chatCache);
 
     if (initialState.chatId) {
-      loadHistory(characterId);
+      await loadHistory(characterId);
     }
   }
 
   async function loadHistory(charId: number): Promise<boolean> {
     const state = chatCache.value.get(charId);
-
     if (
       !state ||
       !state.chatId ||
       state.isFullyLoaded ||
       isLoadingHistory.value
-    ) {
+    )
       return false;
-    }
 
     isLoadingHistory.value = true;
     try {
@@ -101,12 +139,10 @@ export const useChatsStore = defineStore("chats", () => {
         return false;
       }
 
-      state.messages = data.items.concat(state.messages);
+      const reversedItems = data.items.reverse();
+      state.messages = reversedItems.concat(state.messages);
       state.nextCursor = data.next_cursor;
-
-      if (!data.next_cursor) {
-        state.isFullyLoaded = true;
-      }
+      if (!data.next_cursor) state.isFullyLoaded = true;
 
       triggerRef(chatCache);
       return true;
@@ -120,34 +156,55 @@ export const useChatsStore = defineStore("chats", () => {
   async function performSend(msg: Message, state: ChatState) {
     msg.is_pending = true;
     msg.is_error = false;
+    isSending.value = true;
     triggerRef(chatCache);
 
     try {
-      const { data } = await apiClient.post<{ id: number; chat_id: number }>(
-        `/chats/character/${state.characterId}/send/`,
-        { content: msg.content },
-      );
+      const { data } = await apiClient.post<{
+        id: number;
+        chat_id: number;
+        ai_message: Message;
+      }>(`/chats/character/${state.characterId}/send/`, {
+        content: msg.content,
+      });
 
       msg.id = data.id;
       msg.is_pending = false;
 
+      let updatedMessages = [...state.messages];
+
+      if (data.ai_message) {
+        updatedMessages.push(data.ai_message);
+      }
+
+      state.messages = updatedMessages;
+
       if (!state.chatId) {
         state.chatId = data.chat_id;
         const charStore = useCharactersStore();
-        const char = charStore.currentList.items.find(c => c.id === state.characterId);
+        const char = charStore.currentList.items.find(
+          (c) => c.id === state.characterId,
+        );
         if (char) char.chat_id = data.chat_id;
       }
+
+      updateChatListLocally(
+        state.characterId,
+        data.chat_id,
+        data.ai_message?.content || msg.content,
+      );
     } catch {
       msg.is_error = true;
-      msg.is_pending = false;
     } finally {
+      msg.is_pending = false;
+      isSending.value = false;
       triggerRef(chatCache);
     }
   }
 
   async function sendMessage(content: string) {
     const state = activeChatState.value;
-    if (!state || !content.trim()) return;
+    if (!state || !content.trim() || isSending.value) return;
 
     const userMsg: Message = {
       id: `temp_${Date.now()}`,
@@ -158,45 +215,63 @@ export const useChatsStore = defineStore("chats", () => {
       is_error: false,
     };
 
-    state.messages.push(userMsg);
+    state.messages = [...state.messages, userMsg];
     await performSend(userMsg, state);
   }
 
   async function retryMessage(msg: Message) {
     const state = activeChatState.value;
-    if (!state) return;
-
+    if (!state || isSending.value) return;
     await performSend(msg, state);
   }
 
-  function handleIncomingMessage(payload: {
-    chat_id: number;
-    message: Message;
-  }) {
-    for (const state of chatCache.value.values()) {
-      if (state.chatId === payload.chat_id) {
-        const isDuplicate = state.messages
-          .slice(-5)
-          .some((m) => m.id === payload.message.id);
-        if (isDuplicate) return;
+  function updateChatListLocally(
+    characterId: number,
+    chatId: number,
+    lastMessageContent: string,
+  ) {
+    const existingIdx = chatsList.value.findIndex(
+      (c) => c.character.id === characterId,
+    );
 
-        state.messages.push(payload.message);
-
-        touchCache(state.characterId);
-        triggerRef(chatCache);
-        return;
+    if (existingIdx !== -1) {
+      const chat = chatsList.value.splice(existingIdx, 1)[0]!;
+      if (!chat.last_message) chat.last_message = { content: "" } as Message;
+      chat.last_message.content = lastMessageContent;
+      chat.created_at = new Date().toISOString();
+      chatsList.value.unshift(chat);
+    } else {
+      const charStore = useCharactersStore();
+      const character = charStore.currentList.items.find(
+        (c) => c.id === characterId,
+      );
+      if (character) {
+        character.chat_id = chatId;
+        chatsList.value.unshift({
+          id: chatId,
+          character: character,
+          last_message: { content: lastMessageContent } as Message,
+          created_at: new Date().toISOString(),
+        });
       }
     }
   }
 
   return {
+    chatsList,
+    chatsNextCursor,
+    isChatsLoading,
+    isChatsLoaded,
+    fetchChatsList,
+
+    chatCache,
+    activeCharacterId,
     activeChatState,
     isLoadingHistory,
     isSending,
     enterChat,
     sendMessage,
-    retryMessage,
     loadHistory,
-    handleIncomingMessage,
+    retryMessage,
   };
 });

@@ -1,9 +1,21 @@
 from django.db import models
+
 from .base import TimeStampedMixin
 
 
 class Character(TimeStampedMixin):
+    class GenderChoices(models.TextChoices):
+        MALE = "M", "Парень"
+        FEMALE = "F", "Девушка"
+
     name = models.CharField("Имя", max_length=128)
+    gender = models.CharField(
+        "Пол",
+        max_length=1,
+        choices=GenderChoices.choices,
+        default=GenderChoices.FEMALE,
+        db_index=True,
+    )
     tagline = models.CharField("Теглайн", max_length=255, blank=True)
     avatar = models.ImageField("Аватар", upload_to="characters/", blank=True, null=True)
 
@@ -20,6 +32,7 @@ class Character(TimeStampedMixin):
         verbose_name = "Персонаж"
         verbose_name_plural = "Персонажи"
         indexes = [
+            models.Index(fields=["gender", "-interaction_count", "-id"]),
             models.Index(fields=["-interaction_count", "-id"]),
             models.Index(fields=["-created_at", "-id"]),
         ]
