@@ -76,6 +76,13 @@ const openAuthor = () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+
+  width: 100%;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+  position: relative;
+  border-left: 1px solid rgba(255, 255, 255, 0.03);
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .hero-section {

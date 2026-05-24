@@ -57,6 +57,9 @@ const emit = defineEmits<{
   height: 50px;
   padding: 0 16px;
   position: relative;
+  width: 100%;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
 }
 
 .back-button {

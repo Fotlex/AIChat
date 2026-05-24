@@ -4,16 +4,18 @@ import { navLinks } from "@/router/navigation";
 
 <template>
   <nav class="bottom-nav">
-    <router-link
-      v-for="link in navLinks"
-      :key="link.to"
-      :to="link.to"
-      class="nav-button"
-      active-class="active"
-    >
-      <component :is="link.icon" />
-      <span>{{ link.name }}</span>
-    </router-link>
+    <div class="bottom-nav-inner">
+      <router-link
+        v-for="link in navLinks"
+        :key="link.to"
+        :to="link.to"
+        class="nav-button"
+        active-class="active"
+      >
+        <component :is="link.icon" />
+        <span>{{ link.name }}</span>
+      </router-link>
+    </div>
   </nav>
 </template>
 
@@ -23,16 +25,21 @@ import { navLinks } from "@/router/navigation";
   bottom: 0;
   left: 0;
   right: 0;
-  height: calc(70px + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
   background-color: rgba(26, 26, 26, 0.9);
   backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(80, 80, 80, 0.5);
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.bottom-nav-inner {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   align-items: flex-start;
   padding-top: 8px;
-  border-top: 1px solid rgba(80, 80, 80, 0.5);
-  z-index: 100;
+  height: 70px;
+  width: 100%;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
 }
 .nav-button {
   background: none;

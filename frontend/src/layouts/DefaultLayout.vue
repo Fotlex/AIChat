@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
 import { computed } from "vue";
+import TopNav from "@/components/TopNav.vue";
+import BottomNav from "@/components/BottomNav.vue";
 
 const route = useRoute();
 const pageTitle = computed(() => (route.meta.title as string) || "");
@@ -23,12 +25,15 @@ const pageTitle = computed(() => (route.meta.title as string) || "");
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: linear-gradient(160deg, #4c2a4e 0%, #2c2c40 100%);; 
+  background: linear-gradient(160deg, #4c2a4e 0%, #2c2c40 100%);
 }
 
 .main-content {
   flex-grow: 1;
   overflow-y: auto;
+  width: 100%;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
   padding-top: calc(50px + env(safe-area-inset-top));
   padding-bottom: calc(70px + env(safe-area-inset-bottom));
 }

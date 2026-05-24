@@ -181,21 +181,23 @@ const formatTime = (iso: string) => {
     </main>
 
     <footer class="chat-footer">
-      <div class="input-wrapper">
-        <textarea
-          v-model="messageInput"
-          placeholder="Написать..."
-          class="message-input"
-          rows="1"
-          @keydown.enter.prevent="sendMessage"
-        ></textarea>
-        <button
-          @click="sendMessage"
-          class="send-button"
-          :disabled="!messageInput.trim() || chatsStore.isSending"
-        >
-          <i-local-send />
-        </button>
+      <div class="chat-footer-inner">
+        <div class="input-wrapper">
+          <textarea
+            v-model="messageInput"
+            placeholder="Написать..."
+            class="message-input"
+            rows="1"
+            @keydown.enter.prevent="sendMessage"
+          ></textarea>
+          <button
+            @click="sendMessage"
+            class="send-button"
+            :disabled="!messageInput.trim() || chatsStore.isSending"
+          >
+            <i-local-send />
+          </button>
+        </div>
       </div>
     </footer>
   </div>
@@ -209,7 +211,6 @@ const formatTime = (iso: string) => {
   background: #0e0e10;
   transform: translateZ(0);
 }
-
 .messages-container {
   flex: 1;
   overflow-y: auto;
@@ -218,6 +219,21 @@ const formatTime = (iso: string) => {
   padding-top: calc(60px + env(safe-area-inset-top));
   contain: strict;
   will-change: scroll-position;
+  width: 100%;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+}
+.chat-footer {
+  padding: 10px;
+  background: #18181b;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  z-index: 10;
+}
+.chat-footer-inner {
+  width: 100%;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
 }
 
 .virtual-sizer {

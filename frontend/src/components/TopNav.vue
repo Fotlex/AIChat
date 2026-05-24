@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted } from "vue";
 import { useUserStore } from "@/store/user";
 
 defineProps<{
@@ -14,7 +14,7 @@ onMounted(() => {
 
 <template>
   <header class="top-nav">
-    <div class="top-nav-content">
+    <div class="top-nav-inner">
       <h1 class="page-title">{{ title }}</h1>
       <div class="user-balance">
         <i-local-crystal class="balance-icon" />
@@ -30,13 +30,22 @@ onMounted(() => {
   top: 0;
   left: 0;
   right: 0;
-  height: calc(50px + env(safe-area-inset-top));
-  padding-top: env(safe-area-inset-top);
   background-color: rgba(26, 26, 26, 0.9);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(80, 80, 80, 0.5);
   z-index: 100;
   color: white;
+  padding-top: env(safe-area-inset-top);
+}
+.top-nav-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 50px;
+  padding: 0 16px;
+  width: 100%;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
 }
 
 .top-nav-content {

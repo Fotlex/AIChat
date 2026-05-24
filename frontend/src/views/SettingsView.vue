@@ -163,8 +163,6 @@ const logout = () => {
 <style scoped>
 .settings-container {
   padding: 24px 16px;
-  max-width: 600px;
-  margin: 0 auto;
   padding-bottom: 100px;
 }
 .settings-content {

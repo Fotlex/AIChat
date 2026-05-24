@@ -157,6 +157,13 @@ const goToChat = (id: number) => {
   color: white;
   display: flex;
   flex-direction: column;
+
+  width: 100%;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+  position: relative;
+  border-left: 1px solid rgba(255, 255, 255, 0.03);
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
 }
 .top-bar {
   display: flex;
