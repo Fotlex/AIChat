@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from "vue-router";
-import CharactersView from "@/views/CharactersView.vue";
 import LoginView from "@/views/LoginView.vue";
 
 const router = createRouter({
@@ -14,7 +13,7 @@ const router = createRouter({
     {
       path: "/",
       name: "characters",
-      component: CharactersView,
+      component: () => import("@/views/CharactersView.vue"),
       meta: { layout: "DefaultLayout", title: "Персонажи" },
     },
     {
