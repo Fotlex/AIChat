@@ -1,5 +1,7 @@
+import jwt
 import orjson
-from config.utils import R400, R405, fast_json
+from config.utils import R400, R401, R405, fast_json
+from django.conf import settings
 from django.db import IntegrityError
 from django.views.decorators.csrf import csrf_exempt
 
@@ -68,5 +70,31 @@ async def login_view(request):
         tokens = generate_tokens(user_data["id"])
         return fast_json(tokens, status=200)
 
+    except orjson.JSONDecodeError:
+        return R400
+
+
+@csrf_exempt
+async def refresh_token_view(request):
+    if request.method != "POST":
+        return R405
+
+    try:
+        data = orjson.loads(request.body)
+        refresh_token = data.get("refresh")
+
+        if not refresh_token:
+            return R400
+
+        payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=["HS256"])
+
+        if payload.get("type") != "refresh":
+            return R401
+
+        tokens = generate_tokens(payload["user_id"])
+        return fast_json(tokens, status=200)
+
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        return R401
     except orjson.JSONDecodeError:
         return R400
