@@ -1,49 +1,65 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import type { User } from "@/types/index";
-import { getUser } from "@/api";
+import { getUser, getSettingsInfo } from "@/api";
 
 export const useUserStore = defineStore("user", () => {
   const currentUser = ref<User | null>(null);
   const isLoading = ref<boolean>(false);
-  const error = ref<string | null>(null);
+
+  const llms = ref<any[]>([]);
+  const myCharacters = ref<any[]>([]);
+  const isSettingsLoaded = ref(false);
 
   const balance = computed(() => currentUser.value?.balance ?? 0);
-  const userFirstName = computed(
-    () => currentUser.value?.first_name ?? "Гость"
-  );
 
   async function fetchUser() {
-    console.log("Store action: fetchUser вызван.");
     isLoading.value = true;
-    error.value = null;
-
     try {
       const userData = await getUser();
-
-      currentUser.value = userData;
-      console.log(
-        "Store state: данные пользователя обновлены.",
-        currentUser.value
-      );
-    } catch (e: any) {
-      const errorMessage =
-        e.response?.data?.detail || e.message || "Произошла неизвестная ошибка";
-      error.value = errorMessage;
-      console.error("Не удалось загрузить данные пользователя:", errorMessage);
+      const llm_id = currentUser.value?.preferred_llm_id;
+      currentUser.value = { ...userData, preferred_llm_id: llm_id };
+    } catch (e) {
     } finally {
       isLoading.value = false;
     }
   }
 
+  async function loadSettingsInfo(force = false) {
+    if (isSettingsLoaded.value && !force) {
+      getSettingsInfo()
+        .then((data) => {
+          llms.value = data.llms;
+          myCharacters.value = data.my_characters;
+          if (currentUser.value) {
+            currentUser.value.preferred_llm_id = data.user.preferred_llm_id;
+            currentUser.value.username = data.user.username;
+          }
+        })
+        .catch(() => {});
+      return;
+    }
+
+    try {
+      const data = await getSettingsInfo();
+      llms.value = data.llms;
+      myCharacters.value = data.my_characters;
+      if (currentUser.value) {
+        currentUser.value.preferred_llm_id = data.user.preferred_llm_id;
+        currentUser.value.username = data.user.username;
+      }
+      isSettingsLoaded.value = true;
+    } catch (e) {}
+  }
+
   return {
     currentUser,
     isLoading,
-    error,
-
     balance,
-    userFirstName,
-
+    llms,
+    myCharacters,
+    isSettingsLoaded,
     fetchUser,
+    loadSettingsInfo,
   };
 });

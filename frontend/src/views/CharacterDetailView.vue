@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { useCharactersStore } from '@/store/characters';
+import { computed } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useCharactersStore } from "@/store/characters";
 
 const route = useRoute();
 const router = useRouter();
@@ -9,17 +9,16 @@ const charStore = useCharactersStore();
 const charId = Number(route.params.id);
 
 const character = computed(() => {
-  return charStore.currentList.items.find(c => c.id === charId) || null;
+  return charStore.currentList.items.find((c) => c.id === charId) || null;
 });
 
 const startChat = () => {
-  router.push({ name: 'chat', params: { id: charId } });
+  router.push({ name: "chat", params: { id: charId } });
 };
 
 const openAuthor = () => {
-  if (character.value?.author_id) {
-    router.push({ name: 'profile', params: { id: character.value.author_id } });
-  }
+  const id = character.value?.author_id || 0;
+  router.push({ name: "profile", params: { id } });
 };
 </script>
 
@@ -28,7 +27,7 @@ const openAuthor = () => {
     <div class="hero-section">
       <img :src="character.photo || '/default-avatar.png'" class="hero-image" />
       <div class="hero-overlay"></div>
-      
+
       <button class="close-btn" @click="router.back()">
         <i-local-arrow-left style="transform: rotate(0deg)" />
       </button>
@@ -38,10 +37,14 @@ const openAuthor = () => {
       <div class="main-info">
         <h1 class="character-name">{{ character.name }}</h1>
         <div class="divider-line"></div>
-        
+
         <div class="description-scroll">
           <p class="tagline">
-            {{ character.user_story || character.tagline || 'Этот персонаж пока не рассказал свою историю...' }}
+            {{
+              character.user_story ||
+              character.tagline ||
+              "Этот персонаж пока не рассказал свою историю..."
+            }}
           </p>
         </div>
       </div>
@@ -49,13 +52,13 @@ const openAuthor = () => {
       <footer class="footer-actions">
         <div class="author-info" @click="openAuthor">
           <span class="created-by">Создатель:</span>
-          <span class="author-name">@{{ character.author_name || 'Система' }}</span>
+          <span class="author-name"
+            >@{{ character.author_name || "Система" }}</span
+          >
         </div>
 
         <div class="button-stack">
-          <button class="btn-primary" @click="startChat">
-            Начать общение
-          </button>
+          <button class="btn-primary" @click="startChat">Начать общение</button>
           <button class="btn-secondary" @click="openAuthor">
             Все герои автора
           </button>
@@ -90,9 +93,10 @@ const openAuthor = () => {
 .hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, 
-    transparent 0%, 
-    rgba(9, 9, 11, 0.4) 60%, 
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(9, 9, 11, 0.4) 60%,
     rgba(9, 9, 11, 1) 100%
   );
 }
@@ -139,6 +143,7 @@ const openAuthor = () => {
   margin-bottom: 15px;
   background: linear-gradient(to bottom, #fff, #a1a1aa);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 

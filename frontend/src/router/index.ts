@@ -29,12 +29,6 @@ const router = createRouter({
       meta: { layout: "DefaultLayout", title: "Чаты" },
     },
     {
-      path: "/generate",
-      name: "generate",
-      component: () => import("@/views/GenerateView.vue"),
-      meta: { layout: "DefaultLayout", title: "Генератор" },
-    },
-    {
       path: "/store",
       name: "store",
       component: () => import("@/views/StoreView.vue"),

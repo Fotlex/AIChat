@@ -3,8 +3,15 @@ from django.urls import include, path
 from .auth import login_view, refresh_token_view, register_view
 from .character import character_list_view
 from .chat import chat_list_view, chat_messages_view, message_send_view
-from .user import current_user_view, settings_info_view, update_llm_view, redeem_promocode_view, update_profile_view
-from .payment import tariff_list_view, create_payment_view, yookassa_webhook_view
+from .payment import create_payment_view, tariff_list_view, yookassa_webhook_view
+from .user import (
+    current_user_view,
+    redeem_promocode_view,
+    settings_info_view,
+    update_llm_view,
+    update_profile_view,
+    user_profile_view,
+)
 
 auth_patterns = [
     path("register/", register_view),
@@ -15,6 +22,7 @@ auth_patterns = [
 urlpatterns = [
     path("auth/", include(auth_patterns)),
     path("users/me/", current_user_view),
+    path("users/<int:user_id>/profile/", user_profile_view),
     path("users/settings/info/", settings_info_view),
     path("users/settings/update-llm/", update_llm_view),
     path("users/promocodes/redeem/", redeem_promocode_view),

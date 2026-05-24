@@ -5,18 +5,18 @@ export interface Character {
   tagline: string;
   user_story: string;
   photo: string | null;
-  creator: number | null;
+  author_id: number | null;
+  author_name: string | null;
   likes_count: number;
   greeting_message: string | null;
-  chat_id: number | null;
+  chat_id: string | null;
 }
 
 export interface User {
-  telegram_id: number;
+  id: number;
   username: string | null;
-  first_name: string | null;
-  last_name: string | null;
   balance: number;
+  preferred_llm_id?: number | null;
 }
 
 export interface Tariff {
@@ -37,7 +37,7 @@ export interface Message {
 }
 
 export interface Chat {
-  id: number;
+  id: string;
   character: Character;
   last_message: Message | null;
   created_at: string;
@@ -49,12 +49,6 @@ export interface ChatState {
   messages: Message[];
   nextCursor: string | null;
   isFullyLoaded: boolean;
-}
-
-export interface PaginatedResponse<T> {
-  next: string | null;
-  previous: string | null;
-  results: T;
 }
 
 export interface PaginatedResponse<T> {

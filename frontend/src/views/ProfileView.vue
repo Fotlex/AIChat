@@ -1,56 +1,70 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
-import { useUserStore } from '@/store/user';
-import { getSettingsInfo, updateProfile } from '@/api/userApi';
+import { ref, onMounted, computed } from "vue";
+import { useUserStore } from "@/store/user";
+import {
+  getSettingsInfo,
+  getAuthorProfile,
+  updateProfile,
+} from "@/api/userApi";
 import { useRoute, useRouter } from "vue-router";
 
 const userStore = useUserStore();
 const route = useRoute();
 const router = useRouter();
 
-const myCharacters = ref<any[]>([]);
+const profileData = ref<any>(null);
+const profileCharacters = ref<any[]>([]);
 const isEditing = ref(false);
 const editName = ref("");
 const isLoading = ref(true);
-const error = ref("");
 
-const isMyProfile = computed(() => {
-  return Number(route.params.id) === userStore.currentUser?.id;
-});
+const targetId = Number(route.params.id);
+const isMyProfile = computed(() => targetId === userStore.currentUser?.id);
 
 onMounted(async () => {
   try {
     if (!userStore.currentUser) {
       await userStore.fetchUser();
     }
-    
-    const data = await getSettingsInfo();
-    myCharacters.value = data.my_characters;
-    editName.value = data.user.username;
+
+    if (isMyProfile.value) {
+      const data = await getSettingsInfo();
+      profileData.value = data.user;
+      profileCharacters.value = data.my_characters;
+      editName.value = data.user.username;
+    } else {
+      const data = await getAuthorProfile(targetId);
+      profileData.value = data.user;
+      profileCharacters.value = data.characters;
+    }
+  } catch (e) {
+    console.error("Профиль не найден", e);
   } finally {
     isLoading.value = false;
   }
 });
 
 const saveName = async () => {
-  if (!isMyProfile.value) return;
-  
-  if (!editName.value.trim() || editName.value === userStore.currentUser?.username) {
+  if (
+    !isMyProfile.value ||
+    !editName.value.trim() ||
+    editName.value === profileData.value.username
+  ) {
     isEditing.value = false;
     return;
   }
   try {
-    error.value = "";
     await updateProfile(editName.value);
+    profileData.value.username = editName.value;
     await userStore.fetchUser();
     isEditing.value = false;
   } catch (e: any) {
-    error.value = e.response?.data?.error || "Ник занят";
+    alert(e.response?.data?.error || "Ошибка");
   }
 };
 
 const goToChat = (id: number) => {
-  router.push({ name: 'character-detail', params: { id } });
+  router.push({ name: "character-detail", params: { id } });
 };
 </script>
 
@@ -60,70 +74,68 @@ const goToChat = (id: number) => {
       <button class="icon-btn back" @click="router.back()">
         <i-local-arrow-left />
       </button>
-      <h1 class="page-title">{{ isMyProfile ? 'Ваш аккаунт' : 'Профиль автора' }}</h1>
+      <h1 class="page-title">
+        {{ isMyProfile ? "Мой аккаунт" : "Профиль автора" }}
+      </h1>
       <div class="spacer"></div>
     </header>
 
-    <div v-if="isLoading" class="loading-container">
-      <div class="spinner"></div>
-    </div>
+    <div v-if="isLoading" class="loader"><div class="spinner"></div></div>
 
-    <div v-else class="profile-scroll-area">
+    <div v-else-if="profileData" class="profile-scroll-area">
       <section class="user-hero">
         <div class="avatar-wrapper">
           <div class="main-avatar">
-            {{ editName[0]?.toUpperCase() }}
+            {{ profileData.username?.[0]?.toUpperCase() }}
           </div>
-          <div class="avatar-shadow"></div>
         </div>
 
         <div class="name-section">
-          <!-- Если мой профиль — можно кликнуть и редактировать -->
-          <div v-if="!isEditing" class="name-display" :class="{ 'clickable': isMyProfile }" @click="isMyProfile && (isEditing = true)">
-            <span class="user-handle">@{{ isMyProfile ? userStore.currentUser?.username : editName }}</span>
-            <span v-if="isMyProfile" class="edit-hint">Нажмите, чтобы изменить</span>
+          <div
+            v-if="!isEditing"
+            class="name-display"
+            :class="{ clickable: isMyProfile }"
+            @click="isMyProfile && (isEditing = true)"
+          >
+            <span class="user-handle">@{{ profileData.username }}</span>
+            <span v-if="isMyProfile" class="edit-hint"
+              >Нажмите, чтобы изменить</span
+            >
           </div>
-          
-          <!-- Поле ввода только если владелец нажал на ник -->
+
           <div v-else-if="isMyProfile" class="name-edit-field">
-            <input 
-              v-model="editName" 
-              @blur="saveName" 
+            <input
+              v-model="editName"
+              @blur="saveName"
               @keyup.enter="saveName"
               maxlength="20"
-              auto-focus
+              autofocus
             />
           </div>
         </div>
 
         <div class="stats-container">
-          <!-- Блок с кристаллами показывается ТОЛЬКО если профиль мой -->
           <div class="stat-item" v-if="isMyProfile">
             <span class="val">{{ userStore.balance }}</span>
             <span class="lab">Кристаллов 💎</span>
           </div>
-          
-          <!-- Разделитель тоже только если мой профиль (чтобы не висел один) -->
           <div class="vertical-divider" v-if="isMyProfile"></div>
-          
           <div class="stat-item">
-            <span class="val">{{ myCharacters.length }}</span>
-            <span class="lab">Публикаций 🎭</span>
+            <span class="val">{{ profileCharacters.length }}</span>
+            <span class="lab">Персонажей 🎭</span>
           </div>
         </div>
       </section>
 
       <section class="characters-section">
         <h2 class="section-title">Герои автора</h2>
-        
-        <div v-if="myCharacters.length === 0" class="empty-state">
-          <p>Пока нет созданных персонажей</p>
+        <div v-if="profileCharacters.length === 0" class="empty-state">
+          Нет созданных персонажей
         </div>
-
         <div v-else class="compact-grid">
-          <div 
-            v-for="c in myCharacters" 
-            :key="c.id" 
+          <div
+            v-for="c in profileCharacters"
+            :key="c.id"
             class="mini-icon-card"
             @click="goToChat(c.id)"
           >
@@ -141,23 +153,19 @@ const goToChat = (id: number) => {
 <style scoped>
 .profile-page {
   height: 100vh;
-  background: linear-gradient(160deg, #1e1e2e 0%, #000000 100%);
+  background: #0e0e10;
   color: white;
   display: flex;
   flex-direction: column;
 }
-
 .top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: calc(20px + env(safe-area-inset-top)) 20px 20px;
-  z-index: 10;
 }
-
 .icon-btn {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
   width: 42px;
   height: 42px;
   border-radius: 14px;
@@ -165,21 +173,26 @@ const goToChat = (id: number) => {
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  border: none;
 }
-
-.page-title { font-size: 18px; font-weight: 800; }
-.spacer { width: 42px; }
-
-.profile-scroll-area { flex: 1; overflow-y: auto; padding-bottom: 50px; }
-
+.spacer {
+  width: 42px;
+}
+.profile-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 50px;
+}
 .user-hero {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 40px 20px;
+  padding: 20px;
 }
-
-.avatar-wrapper { position: relative; margin-bottom: 25px; }
+.avatar-wrapper {
+  margin-bottom: 20px;
+}
 .main-avatar {
   width: 110px;
   height: 110px;
@@ -190,73 +203,81 @@ const goToChat = (id: number) => {
   justify-content: center;
   font-size: 46px;
   font-weight: 900;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-  position: relative;
-  z-index: 2;
+  box-shadow: 0 10px 30px rgba(123, 97, 255, 0.3);
 }
-
-.avatar-shadow {
-  position: absolute;
-  bottom: -10px;
-  width: 80%;
-  height: 20px;
-  background: #7b61ff;
-  filter: blur(20px);
-  opacity: 0.5;
-  z-index: 1;
-}
-
 .name-display {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
-
-.name-display.clickable { cursor: pointer; }
-
-.user-handle { font-size: 28px; font-weight: 900; letter-spacing: -0.5px; }
-.edit-hint { font-size: 12px; color: #8e8e93; font-weight: 600; opacity: 0.7; }
-
+.name-display.clickable {
+  cursor: pointer;
+}
+.user-handle {
+  font-size: 28px;
+  font-weight: 900;
+}
+.edit-hint {
+  font-size: 12px;
+  color: #8e8e93;
+}
 .name-edit-field input {
   background: rgba(255, 255, 255, 0.05);
   border: 2px solid #7b61ff;
-  border-radius: 15px;
-  padding: 12px 20px;
+  border-radius: 12px;
+  padding: 10px;
   color: white;
   text-align: center;
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 20px;
   outline: none;
 }
-
 .stats-container {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 30px;
-  margin-top: 35px;
+  margin-top: 30px;
   background: rgba(255, 255, 255, 0.03);
-  padding: 20px 40px;
-  border-radius: 25px;
+  padding: 15px 30px;
+  border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.05);
-  min-width: 200px;
 }
-
-.stat-item { display: flex; flex-direction: column; align-items: center; }
-.val { font-size: 22px; font-weight: 900; color: #fff; }
-.lab { font-size: 11px; color: #8e8e93; text-transform: uppercase; font-weight: 700; margin-top: 4px; }
-.vertical-divider { width: 1px; height: 30px; background: rgba(255, 255, 255, 0.1); }
-
-.characters-section { padding: 20px; }
-.section-title { font-size: 12px; font-weight: 800; color: rgba(255, 255, 255, 0.3); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 20px; }
-
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.val {
+  font-size: 20px;
+  font-weight: bold;
+}
+.lab {
+  font-size: 11px;
+  color: #8e8e93;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+.vertical-divider {
+  width: 1px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.characters-section {
+  padding: 20px;
+}
+.section-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: #8e8e93;
+  text-transform: uppercase;
+  margin-bottom: 15px;
+}
 .compact-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 15px;
 }
-
 .mini-icon-card {
   display: flex;
   flex-direction: column;
@@ -264,30 +285,42 @@ const goToChat = (id: number) => {
   gap: 8px;
   cursor: pointer;
 }
-
 .icon-img-box {
   width: 100%;
-  aspect-ratio: 1/1;
-  border-radius: 18px;
-  overflow: hidden;
+  aspect-ratio: 1;
+  border-radius: 16px;
   background: #1c1c1e;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
 }
-
-.icon-img-box img { width: 100%; height: 100%; object-fit: cover; }
-
+.icon-img-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .tiny-name {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 12px;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   width: 100%;
-  color: rgba(255, 255, 255, 0.7);
 }
-
-.loading-container { display: flex; justify-content: center; padding-top: 100px; }
-.spinner { width: 30px; height: 30px; border: 3px solid rgba(255, 255, 255, 0.1); border-top-color: #7b61ff; border-radius: 50%; animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.loader {
+  display: flex;
+  justify-content: center;
+  padding-top: 100px;
+}
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #7b61ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 </style>

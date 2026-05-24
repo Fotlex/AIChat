@@ -28,7 +28,7 @@ import { navLinks } from "@/router/navigation";
   background-color: rgba(26, 26, 26, 0.9);
   backdrop-filter: blur(10px);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   align-items: flex-start;
   padding-top: 8px;
   border-top: 1px solid rgba(80, 80, 80, 0.5);

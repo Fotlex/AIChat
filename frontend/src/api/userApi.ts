@@ -21,6 +21,13 @@ export const redeemPromocode = async (code: string) => {
 };
 
 export const updateProfile = async (username: string) => {
-  const response = await apiClient.post("/users/settings/update-profile/", { username });
+  const response = await apiClient.post("/users/settings/update-profile/", {
+    username,
+  });
+  return response.data;
+};
+
+export const getAuthorProfile = async (userId: number) => {
+  const response = await apiClient.get(`/users/${userId}/profile/`);
   return response.data;
 };
