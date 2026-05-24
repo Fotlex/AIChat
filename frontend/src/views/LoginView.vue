@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import axios from "axios";
 
@@ -9,6 +9,12 @@ const username = ref("");
 const password = ref("");
 const errorMsg = ref("");
 const isLoading = ref(false);
+
+const gliderStyle = computed(() => {
+  return {
+    transform: isLogin.value ? "translateX(0%)" : "translateX(100%)",
+  };
+});
 
 const submit = async () => {
   if (!username.value || !password.value) {
@@ -49,6 +55,7 @@ const submit = async () => {
       </div>
 
       <div class="tabs">
+        <span class="glider" :style="gliderStyle"></span>
         <button :class="{ active: isLogin }" @click="isLogin = true">
           Вход
         </button>
@@ -116,6 +123,7 @@ const submit = async () => {
 }
 .tabs {
   display: flex;
+  position: relative;
   background: #2c2c2e;
   border-radius: 12px;
   padding: 4px;
@@ -127,15 +135,26 @@ const submit = async () => {
   background: none;
   border: none;
   color: #999;
-  border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
+  z-index: 2;
+  transition: color 0.3s ease;
 }
 .tabs button.active {
-  background: #007aff;
   color: white;
+}
+.glider {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  height: calc(100% - 8px);
+  width: calc((100% - 8px) / 2);
+  background-color: #007aff;
+  border-radius: 9px;
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  z-index: 1;
+  will-change: transform; 
 }
 .auth-form {
   display: flex;
