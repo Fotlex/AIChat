@@ -33,7 +33,7 @@ function formatLikes(count: number): string {
 
       <div class="card-info">
         <div class="card-name">{{ character.name }}</div>
-        <div class="card-desc">{{ character.description }}</div>
+        <div class="card-desc">{{ character.tagline }}</div>
       </div>
     </div>
   </div>

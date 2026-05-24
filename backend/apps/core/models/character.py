@@ -17,6 +17,7 @@ class Character(TimeStampedMixin):
         db_index=True,
     )
     tagline = models.CharField("Теглайн", max_length=255, blank=True)
+    user_story = models.TextField("История для пользователеля", blank=True)
     avatar = models.ImageField("Аватар", upload_to="characters/", blank=True, null=True)
 
     system_prompt = models.TextField("Системный промпт")

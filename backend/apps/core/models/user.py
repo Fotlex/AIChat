@@ -4,6 +4,12 @@ from .base import TimeStampedMixin
 
 class User(TimeStampedMixin):
     id = models.BigAutoField(primary_key=True)
+    preferred_llm = models.ForeignKey(
+        "LLMConfiguration", 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
     username = models.CharField(
         "Имя пользователя", max_length=64, unique=True, db_index=True
     )

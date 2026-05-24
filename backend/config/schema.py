@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str
     POSTGRES_PORT: int
     POSTGRES_DB: str
+    
+    YOOKASSA_SHOP_ID: str
+    YOOKASSA_SECRET_KEY: str
+    
+    APP_URL: str
 
     ADMIN_SITE_HEADER: str = "AIChat Admin"
     ADMIN_SITE_TITLE: str = "Панель управления"

@@ -31,7 +31,7 @@ const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
 
 const handleSelect = (id: number) => {
-  router.push({ name: "chat", params: { id } });
+  router.push({ name: "character-detail", params: { id } });
 };
 
 watch(

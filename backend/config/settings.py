@@ -94,6 +94,11 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+YOOKASSA_SHOP_ID = conf.YOOKASSA_SHOP_ID
+YOOKASSA_SECRET_KEY = conf.YOOKASSA_SECRET_KEY
+
+APP_URL = conf.APP_URL
+
 ADMIN_SITE_HEADER = conf.ADMIN_SITE_HEADER
 ADMIN_SITE_TITLE = conf.ADMIN_SITE_TITLE
 ADMIN_INDEX_TITLE = conf.ADMIN_INDEX_TITLE
@@ -102,4 +107,9 @@ ADMIN_REORDER = [
     {"label": "🎭 Персонажи", "models": ["core.Character"]},
     {"label": "💬 Чаты и Сообщения", "models": ["core.Conversation", "core.Message"]},
     {"label": "⚙️ Настройки LLM", "models": ["core.LLMConfiguration"]},
+    {"label": "💳 Платежи и Промокоды", "models": [
+        "core.Tariff", 
+        "core.Transaction", 
+        "core.Promocode"
+    ]},
 ]

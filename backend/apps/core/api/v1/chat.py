@@ -6,7 +6,7 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from apps.core.decorators import jwt_auth
-from apps.core.models import Character, Conversation, LLMConfiguration, Message
+from apps.core.models import Character, Conversation, LLMConfiguration, Message, User
 
 
 @jwt_auth(methods=["GET"])
@@ -114,10 +114,13 @@ async def message_send_view(request, character_id):
     created_messages = []
 
     if not conv:
-        llm = await LLMConfiguration.objects.filter(is_active=True).afirst()
-        if not llm:
-            return fast_json({"error": "LLM not configured in admin"}, status=500)
-
+        user = await User.objects.aget(id=request.user_id)
+        llm_id = user.preferred_llm_id
+        
+        if not llm_id:
+            llm = await LLMConfiguration.objects.filter(is_active=True).afirst()
+            llm_id = llm.id if llm else None
+            
         char = (
             await Character.objects.filter(id=character_id)
             .values("greeting_message")
@@ -127,7 +130,7 @@ async def message_send_view(request, character_id):
         conv = await Conversation.objects.acreate(
             user_id=request.user_id,
             character_id=character_id,
-            llm_config_id=llm.id,
+            llm_config_id=llm_id,
             last_message_preview=content,
             last_activity_at=now,
         )

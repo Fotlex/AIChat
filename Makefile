@@ -3,7 +3,8 @@ COMPOSE_PROJECT_NAME_DEV=aichat-dev
 COMPOSE_FILE_DEV = docker/docker-compose.dev.yaml
 ENV_FILE = .env
 
-DC_DEV=docker compose -f $(COMPOSE_FILE_DEV) -p $(COMPOSE_PROJECT_NAME_DEV) --env-file $(ENV_FILE)
+DC_DEV=DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose -f $(COMPOSE_FILE_DEV) -p $(COMPOSE_PROJECT_NAME_DEV) --env-file $(ENV_FILE)
+
 MANAGE_DEV = $(DC_DEV) exec backend python manage.py
 
 .PHONY: dev-build dev-up dev-down dev-stop dev-restart dev-logs dev-shell \

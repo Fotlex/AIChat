@@ -17,6 +17,12 @@ const router = createRouter({
       meta: { layout: "DefaultLayout", title: "Персонажи" },
     },
     {
+      path: "/character/:id",
+      name: "character-detail",
+      component: () => import("@/views/CharacterDetailView.vue"),
+      meta: { layout: "BlankLayout" },
+    },
+    {
       path: "/chats",
       name: "chats",
       component: () => import("@/views/ChatsView.vue"),
@@ -33,6 +39,12 @@ const router = createRouter({
       name: "store",
       component: () => import("@/views/StoreView.vue"),
       meta: { layout: "DefaultLayout", title: "Магазин" },
+    },
+    {
+      path: "/profile/:id",
+      name: "profile",
+      component: () => import("@/views/ProfileView.vue"),
+      meta: { layout: "BlankLayout" },
     },
     {
       path: "/settings",

@@ -46,7 +46,10 @@ async def character_list_view(request):
             "id",
             "name",
             "tagline",
+            "user_story",
             "greeting_message",
+            "author_id",
+            author_name=F("author__username"),
             likes_count=F("interaction_count"),
             photo=F("avatar"),
         )[: limit + 1]

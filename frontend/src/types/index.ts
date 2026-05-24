@@ -2,7 +2,8 @@ export interface Character {
   id: number;
   name: string;
   gender: "M" | "F";
-  description: string;
+  tagline: string;
+  user_story: string;
   photo: string | null;
   creator: number | null;
   likes_count: number;
