@@ -18,6 +18,7 @@ const charStore = useCharactersStore();
 const characterId = Number(route.params.id);
 const parentRef = ref<HTMLElement | null>(null);
 const messageInput = ref("");
+const textareaRef = ref<HTMLTextAreaElement | null>(null);
 
 const character = computed(
   () => charStore.currentList.items.find((c) => c.id === characterId) || null,
@@ -120,6 +121,10 @@ const sendMessage = async () => {
   const text = messageInput.value;
   messageInput.value = "";
 
+  if (textareaRef.value) {
+    textareaRef.value.value = "";
+  }
+
   scrollToBottom("smooth");
 
   await chatsStore.sendMessage(text);
@@ -202,6 +207,7 @@ const formatTime = (iso: string) => {
       <div class="chat-footer-inner">
         <div class="input-wrapper">
           <textarea
+            ref="textareaRef"
             @input="messageInput = ($event.target as HTMLTextAreaElement).value"
             placeholder="Написать..."
             class="message-input"
