@@ -50,6 +50,7 @@ jobs:
           YOOKASSA_SHOP_ID: "000"
           YOOKASSA_SECRET_KEY: "mock"
           APP_URL: "http://localhost"
+          HF_TOKEN: "hf_MOCKTOKENdfgHJKlmnoPQRstuvWXyz12345"
         run: poetry run pytest
 
   frontend-tests:
