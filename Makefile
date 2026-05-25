@@ -12,7 +12,8 @@ MANAGE_DEV = $(DC_DEV) exec backend python manage.py
 MANAGE_PROD = $(DC_PROD) exec backend python manage.py
 
 .PHONY: dev-build dev-up dev-down dev-stop dev-restart dev-logs dev-shell \
-        dev-startapp dev-makemigrations dev-migrate dev-superuser dev-static
+        dev-startapp dev-makemigrations dev-migrate dev-superuser dev-static \
+		dev-test-backend dev-test-frontend dev-test-all
 
 # ================= DEV =================
 
@@ -54,6 +55,14 @@ dev-superuser:
 
 dev-static:
 	$(MANAGE_DEV) collectstatic --noinput
+
+dev-test-backend:
+	$(DC_DEV) exec backend pytest apps/core/tests/
+
+dev-test-frontend:
+	$(DC_DEV) exec frontend npm run test -- --run
+
+dev-test-all: dev-test-backend dev-test-frontend
 
 # ================= PROD =================
 

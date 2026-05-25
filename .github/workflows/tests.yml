@@ -1,0 +1,80 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    
+    # Запускаем временную базу данных прямо в GitHub
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry
+        run: curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Install Dependencies
+        working-directory: ./backend
+        run: poetry install
+
+      - name: Run Pytest
+        working-directory: ./backend
+        env:
+          DJANGO_SECRET_KEY: "ci-secret-key"
+          POSTGRES_DB: test_db
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          TIMEZONE: UTC
+          DEBUG: True
+          ALLOWED_HOSTS: "*"
+          CSRF_TRUSTED_ORIGINS: "http://localhost"
+          YOOKASSA_SHOP_ID: "000"
+          YOOKASSA_SECRET_KEY: "mock"
+          APP_URL: "http://localhost"
+        run: poetry run pytest
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json'
+
+      - name: Install Dependencies
+        working-directory: ./frontend
+        run: npm install
+
+      - name: Run Vitest
+        working-directory: ./frontend
+        run: npm run test -- --run
