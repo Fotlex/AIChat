@@ -1,15 +1,34 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { ref, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useCharactersStore } from "@/store/characters";
+import { useUserStore } from "@/store/user";
+import { getCharacterById } from "@/api/charactersApi";
+import type { Character } from "@/types";
 
 const route = useRoute();
 const router = useRouter();
 const charStore = useCharactersStore();
+const userStore = useUserStore();
 const charId = Number(route.params.id);
 
-const character = computed(() => {
-  return charStore.currentList.items.find((c) => c.id === charId) || null;
+const character = ref<Character | null>(null);
+
+onMounted(async () => {
+  if (!userStore.currentUser) await userStore.fetchUser();
+
+  let found = charStore.currentList.items.find((c) => c.id === charId);
+  if (found) {
+    character.value = found;
+  } else {
+    try {
+      const fetched = await getCharacterById(charId);
+      character.value = fetched;
+      charStore.currentList.items.push(fetched);
+    } catch (e) {
+      router.back();
+    }
+  }
 });
 
 const startChat = () => {
@@ -37,7 +56,6 @@ const openAuthor = () => {
       <div class="main-info">
         <h1 class="character-name">{{ character.name }}</h1>
         <div class="divider-line"></div>
-
         <div class="description-scroll">
           <p class="tagline">
             {{
@@ -58,9 +76,8 @@ const openAuthor = () => {
         </div>
 
         <div class="button-stack">
-          <button class="btn-primary" @click="startChat">Начать общение</button>
-          <button class="btn-secondary" @click="openAuthor">
-            Все герои автора
+          <button class="btn-primary" @click="startChat">
+            Чат с персонажем
           </button>
         </div>
       </footer>

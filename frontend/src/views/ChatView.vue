@@ -6,6 +6,7 @@ import { useVirtualizer } from "@tanstack/vue-virtual";
 import { useChatsStore } from "@/store/chats";
 import { useUserStore } from "@/store/user";
 import { useCharactersStore } from "@/store/characters";
+import { getCharacterById } from "@/api/charactersApi";
 import ChatHeader from "@/components/ChatHeader.vue";
 
 const route = useRoute();
@@ -53,6 +54,17 @@ const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
 };
 
 onMounted(async () => {
+  let found = charStore.currentList.items.find((c) => c.id === characterId);
+  if (!found) {
+    try {
+      const fetched = await getCharacterById(characterId);
+      charStore.currentList.items.push(fetched);
+    } catch (e) {
+      router.back();
+      return;
+    }
+  }
+
   await chatsStore.enterChat(characterId);
 
   nextTick(() => {

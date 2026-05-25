@@ -12,6 +12,7 @@ export interface Character {
   greeting_message: string | null;
   chat_id: string | null;
   created_at?: string;
+  is_public?: boolean;
 }
 
 export interface User {

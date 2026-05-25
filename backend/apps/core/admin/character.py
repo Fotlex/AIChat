@@ -11,7 +11,7 @@ class CharacterAdmin(admin.ModelAdmin):
     def display_avatar(self, obj):
         if obj.avatar:
             return format_html(
-                '<img src="{}" width="40" height="40" style="border-radius:50%;" />',
+                '<img src="{}" width="40" height="40" style="border-radius:50%; object-fit:cover;" />',
                 obj.avatar.url,
             )
         return "—"

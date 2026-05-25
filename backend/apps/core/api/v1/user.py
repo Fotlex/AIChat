@@ -40,9 +40,9 @@ async def settings_info_view(request):
             "photo": f"/media/{c['avatar']}" if c["avatar"] else None,
             "likes": c["interaction_count"],
         }
-        async for c in Character.objects.filter(author_id=request.user_id).values(
-            "id", "name", "avatar", "interaction_count"
-        )
+        async for c in Character.objects.filter(author_id=request.user_id)
+        .values("id", "name", "avatar", "interaction_count")
+        .order_by("-created_at")
     ]
 
     llms = [

@@ -21,6 +21,10 @@ const isLoading = ref(true);
 const targetId = Number(route.params.id);
 const isMyProfile = computed(() => targetId === userStore.currentUser?.id);
 
+const handleCharClick = (c: any) => {
+  router.push({ name: "character-detail", params: { id: c.id } });
+};
+
 onMounted(async () => {
   try {
     if (!userStore.currentUser) {
@@ -61,10 +65,6 @@ const saveName = async () => {
   } catch (e: any) {
     alert(e.response?.data?.error || "Ошибка");
   }
-};
-
-const goToChat = (id: number) => {
-  router.push({ name: "character-detail", params: { id } });
 };
 </script>
 
@@ -137,7 +137,7 @@ const goToChat = (id: number) => {
             v-for="c in profileCharacters"
             :key="c.id"
             class="mini-icon-card"
-            @click="goToChat(c.id)"
+            @click="handleCharClick(c)"
           >
             <div class="icon-img-box">
               <img :src="c.photo || '/default-avatar.png'" alt="" />
@@ -303,6 +303,7 @@ const goToChat = (id: number) => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  position: relative;
 }
 .tiny-name {
   font-size: 12px;

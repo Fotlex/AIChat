@@ -1,7 +1,12 @@
 from django.urls import include, path
 
 from .auth import login_view, refresh_token_view, register_view
-from .character import character_list_view, toggle_favorite_view
+from .character import (
+    character_detail_view,
+    character_list_view,
+    create_character_view,
+    toggle_favorite_view,
+)
 from .chat import chat_list_view, chat_messages_view, message_send_view
 from .payment import create_payment_view, tariff_list_view, yookassa_webhook_view
 from .user import (
@@ -28,6 +33,8 @@ urlpatterns = [
     path("users/promocodes/redeem/", redeem_promocode_view),
     path("users/settings/update-profile/", update_profile_view),
     path("characters/", character_list_view),
+    path("characters/create/", create_character_view),
+    path("characters/<int:character_id>/", character_detail_view),
     path("characters/<int:character_id>/favorite/", toggle_favorite_view),
     path("chats/", chat_list_view),
     path("chats/<uuid:chat_id>/messages/", chat_messages_view),

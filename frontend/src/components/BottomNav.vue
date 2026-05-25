@@ -33,7 +33,7 @@ import { navLinks } from "@/router/navigation";
 }
 .bottom-nav-inner {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   align-items: flex-start;
   padding-top: 8px;
   height: 70px;

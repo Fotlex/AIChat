@@ -17,9 +17,22 @@ export const getCharacters = async (
   return response.data;
 };
 
+export const getCharacterById = async (id: number): Promise<Character> => {
+  const response = await apiClient.get<Character>(`/characters/${id}/`);
+  return response.data;
+};
+
 export const toggleFavoriteApi = async (
   characterId: number,
 ): Promise<{ status: string }> => {
-  const response = await apiClient.post(`/characters/${characterId}/favorite/`);
+  const response = await apiClient.post(
+    `/characters/${characterId}/favorite/`,
+    {},
+  );
+  return response.data;
+};
+
+export const createCharacterApi = async (data: any) => {
+  const response = await apiClient.post("/characters/create/", data);
   return response.data;
 };

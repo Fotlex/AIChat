@@ -1,17 +1,24 @@
 import base64
+import logging
+import uuid
 
 import orjson
+from asgiref.sync import sync_to_async
 from config.utils import fast_json
+from django.core.files.base import ContentFile
+from django.db import transaction
 from django.db.models import Exists, F, OuterRef, Q
 
 from apps.core.decorators import jwt_auth
-from apps.core.models import Character, Conversation
+from apps.core.models import Character, Conversation, User
 from apps.core.models.character import FavoriteCharacter
 
 SORT_CONFIG = {
     "recent": ("created_at", "id"),
     "popular": ("interaction_count", "id"),
 }
+
+logger = logging.getLogger(__name__)
 
 
 @jwt_auth(methods=["GET"])
@@ -114,3 +121,131 @@ async def toggle_favorite_view(request, character_id):
             interaction_count=F("interaction_count") + 1
         )
         return fast_json({"status": "liked"})
+
+
+def _create_character_sync_transaction(
+    user_id, name, tagline, system_prompt, greeting_message, avatar_b64
+):
+    with transaction.atomic():
+        user = User.objects.select_for_update().get(id=user_id)
+
+        PUBLISH_COST = 100
+        if user.balance < PUBLISH_COST:
+            raise ValueError("Недостаточно кристаллов для создания (нужно 100 💎)")
+
+        user.balance -= PUBLISH_COST
+        user.save()
+
+        char = Character(
+            name=name[:128],
+            tagline=tagline[:255],
+            system_prompt=system_prompt,
+            greeting_message=greeting_message,
+            author_id=user_id,
+            is_public=True,
+        )
+
+        if avatar_b64 and ";base64," in avatar_b64:
+            format_str, imgstr = avatar_b64.split(";base64,")
+            ext = format_str.split("/")[-1]
+            img_data = base64.b64decode(imgstr)
+            char.avatar.save(
+                f"avatar_{uuid.uuid4().hex[:8]}.{ext}",
+                ContentFile(img_data),
+                save=False,
+            )
+
+        char.save()
+        return char.id, user.balance
+
+
+create_character_in_db = sync_to_async(_create_character_sync_transaction)
+
+
+@jwt_auth(methods=["POST"])
+async def create_character_view(request):
+    try:
+        data = orjson.loads(request.body)
+        name = data.get("name", "").strip()
+        tagline = data.get("tagline", "").strip()
+        system_prompt = data.get("system_prompt", "").strip()
+        greeting_message = data.get("greeting_message", "").strip()
+        avatar_b64 = data.get("avatar")
+
+        if not name or not system_prompt:
+            return fast_json(
+                {"error": "Имя и системный промпт обязательны"}, status=400
+            )
+
+        try:
+            char_id, new_balance = await create_character_in_db(
+                request.user_id,
+                name,
+                tagline,
+                system_prompt,
+                greeting_message,
+                avatar_b64,
+            )
+        except ValueError as e:
+            return fast_json({"error": str(e)}, status=400)
+
+        return fast_json(
+            {"status": "ok", "id": char_id, "new_balance": new_balance}, status=201
+        )
+
+    except Exception as e:
+        logger.error(
+            "Ошибка при создании персонажа в представлении: %s", str(e), exc_info=True
+        )
+        return fast_json({"error": "Ошибка при создании персонажа"}, status=400)
+
+
+@jwt_auth(methods=["GET"])
+async def character_detail_view(request, character_id):
+    char = (
+        await Character.objects.filter(id=character_id)
+        .values(
+            "id",
+            "name",
+            "gender",
+            "tagline",
+            "user_story",
+            "greeting_message",
+            "avatar",
+            "author_id",
+            "interaction_count",
+            "is_public",
+            "created_at",
+            author_name=F("author__username"),
+        )
+        .afirst()
+    )
+
+    if not char:
+        return fast_json({"error": "Не найден"}, status=404)
+
+    if not char["is_public"] and char["author_id"] != request.user_id:
+        return fast_json({"error": "Доступ запрещен"}, status=403)
+
+    if char["avatar"]:
+        char["photo"] = f"/media/{char['avatar']}"
+    else:
+        char["photo"] = None
+
+    char["likes_count"] = char.pop("interaction_count")
+
+    is_fav = await FavoriteCharacter.objects.filter(
+        user_id=request.user_id, character_id=character_id
+    ).aexists()
+    char["is_favorite"] = is_fav
+
+    conv = (
+        await Conversation.objects.filter(
+            user_id=request.user_id, character_id=character_id
+        )
+        .values("id")
+        .afirst()
+    )
+    char["chat_id"] = str(conv["id"]) if conv else None
+
+    return fast_json(char)

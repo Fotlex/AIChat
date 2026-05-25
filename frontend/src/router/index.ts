@@ -29,6 +29,12 @@ const router = createRouter({
       meta: { layout: "DefaultLayout", title: "Чаты" },
     },
     {
+      path: "/create",
+      name: "create",
+      component: () => import("@/views/CreateView.vue"),
+      meta: { layout: "DefaultLayout", title: "Создание героя" },
+    },
+    {
       path: "/store",
       name: "store",
       component: () => import("@/views/StoreView.vue"),
