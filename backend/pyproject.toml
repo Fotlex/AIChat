@@ -17,6 +17,7 @@ dependencies = [
     "psycopg[binary,pool] (>=3.3.4,<4.0.0)",
     "pillow (>=12.2.0,<13.0.0)",
     "yookassa (>=3.10.1,<4.0.0)",
+    "openai (>=2.38.0,<3.0.0)",
 ]
 
 

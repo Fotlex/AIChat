@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     YOOKASSA_SECRET_KEY: str
     
     APP_URL: str
+    HF_TOKEN: str = ""
 
     ADMIN_SITE_HEADER: str = "AIChat Admin"
     ADMIN_SITE_TITLE: str = "Панель управления"

@@ -2,8 +2,11 @@ import base64
 
 import orjson
 from config.utils import R400, fast_json
+from django.conf import settings
 from django.db.models import F, Q
+from django.http import StreamingHttpResponse
 from django.utils import timezone
+from openai import AsyncOpenAI
 
 from apps.core.decorators import jwt_auth
 from apps.core.models import Character, Conversation, LLMConfiguration, Message, User
@@ -96,6 +99,12 @@ async def chat_messages_view(request, chat_id):
     return fast_json({"items": messages, "next_cursor": next_cursor})
 
 
+aclient = AsyncOpenAI(
+    base_url="https://router.huggingface.co/v1",
+    api_key=settings.HF_TOKEN,
+)
+
+
 @jwt_auth(methods=["POST"])
 async def message_send_view(request, character_id):
     try:
@@ -107,75 +116,122 @@ async def message_send_view(request, character_id):
     if not content:
         return R400
 
+    user = await User.objects.select_related("preferred_llm").aget(id=request.user_id)
+    llm = user.preferred_llm
+    if not llm:
+        llm = await LLMConfiguration.objects.filter(is_active=True).afirst()
+
+    if not llm:
+        return fast_json({"error": "Нет доступных моделей"}, status=400)
+
+    # ПРОВЕРКА БАЛАНСА
+    if user.balance < llm.cost_per_request:
+        return fast_json({"error": "Недостаточно кристаллов 💎"}, status=402)
+
     now = timezone.now()
+    char = await Character.objects.aget(id=character_id)
     conv = await Conversation.objects.filter(
         user_id=request.user_id, character_id=character_id
     ).afirst()
+
     created_messages = []
 
     if not conv:
-        user = await User.objects.aget(id=request.user_id)
-        llm_id = user.preferred_llm_id
-        
-        if not llm_id:
-            llm = await LLMConfiguration.objects.filter(is_active=True).afirst()
-            llm_id = llm.id if llm else None
-            
-        char = (
-            await Character.objects.filter(id=character_id)
-            .values("greeting_message")
-            .afirst()
-        )
-
         conv = await Conversation.objects.acreate(
             user_id=request.user_id,
             character_id=character_id,
-            llm_config_id=llm_id,
-            last_message_preview=content,
+            llm_config_id=llm.id,
             last_activity_at=now,
         )
-        if char and char["greeting_message"]:
+        if char.greeting_message:
             created_messages.append(
                 Message(
                     conversation=conv,
                     role=Message.RoleChoices.ASSISTANT,
-                    content=char["greeting_message"],
+                    content=char.greeting_message,
                 )
             )
 
+    # Создаем сообщение пользователя и пустышку для ИИ
     user_msg = Message(
         conversation=conv,
         role=Message.RoleChoices.USER,
         content=content,
         created_at=now,
     )
-    created_messages.append(user_msg)
-
-    ai_text = f"✨ [Нейросеть]: Я получила твое сообщение: «{content[:30]}...»"
     ai_msg = Message(
         conversation=conv,
         role=Message.RoleChoices.ASSISTANT,
-        content=ai_text,
+        content="",
         created_at=now,
     )
-    created_messages.append(ai_msg)
-
+    created_messages.extend([user_msg, ai_msg])
     await Message.objects.abulk_create(created_messages)
 
-    await Conversation.objects.filter(id=conv.id).aupdate(
-        last_message_preview=ai_text, last_activity_at=now
+    # Собираем контекст (последние 10 сообщений для экономии)
+    history = [
+        msg
+        async for msg in Message.objects.filter(conversation=conv).order_by("-id")[:10]
+    ]
+    history.reverse()
+
+    # ЖЕСТКИЙ ПРОМПТ
+    system_prompt = (
+        f"{char.system_prompt}\n\n"
+        "ВАЖНОЕ ПРАВИЛО: Ты общаешься строго на РУССКОМ языке. "
+        "Никогда не признавайся, что ты ИИ, языковая модель или программа. "
+        "Отыгрывай своего персонажа на 100%, используй его манеру речи."
     )
 
-    return fast_json(
-        {
-            "id": user_msg.id,
-            "chat_id": str(conv.id),
-            "ai_message": {
-                "id": ai_msg.id,
-                "role": ai_msg.role,
-                "content": ai_text,
-                "created_at": ai_msg.created_at.isoformat(),
-            },
-        },
-        status=201,
-    )
+    api_messages = [{"role": "system", "content": system_prompt}]
+    for h in history:
+        # Пропускаем пустые (наша текущая пустышка)
+        if h.content:
+            api_messages.append({"role": h.role, "content": h.content})
+
+    # АСИНХРОННЫЙ ГЕНЕРАТОР СТРИМА
+    async def event_stream():
+        full_text = ""
+        try:
+            # Сначала отправляем метаданные фронту
+            init_data = {
+                "type": "init",
+                "user_msg": {"id": user_msg.id, "content": user_msg.content},
+                "ai_msg_id": ai_msg.id,
+                "chat_id": str(conv.id),
+            }
+            yield f"data: {orjson.dumps(init_data).decode()}\n\n"
+
+            stream = await aclient.chat.completions.create(
+                model=llm.provider_code,  # В админке укажите "Qwen/Qwen2.5-7B-Instruct:fastest" и тд
+                messages=api_messages,
+                stream=True,
+                max_tokens=800,
+                temperature=0.7,
+            )
+
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    text_chunk = chunk.choices[0].delta.content
+                    full_text += text_chunk
+                    yield f"data: {orjson.dumps({'type': 'chunk', 'text': text_chunk}).decode()}\n\n"
+
+            # УСПЕШНОЕ ЗАВЕРШЕНИЕ: Обновляем БД и списываем баланс
+            if full_text:
+                await Message.objects.filter(id=ai_msg.id).aupdate(content=full_text)
+                await Conversation.objects.filter(id=conv.id).aupdate(
+                    last_message_preview=full_text[:100],
+                    last_activity_at=timezone.now(),
+                )
+                await User.objects.filter(id=user.id).aupdate(
+                    balance=F("balance") - llm.cost_per_request
+                )
+
+            yield f"data: {orjson.dumps({'type': 'done'}).decode()}\n\n"
+
+        except Exception as e:
+            yield f"data: {orjson.dumps({'type': 'error', 'message': str(e)}).decode()}\n\n"
+
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    return response

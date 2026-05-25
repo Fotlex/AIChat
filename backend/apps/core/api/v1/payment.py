@@ -95,5 +95,5 @@ async def yookassa_webhook_view(request):
 
         return fast_json({"status": "ok"}, status=200)
 
-    except Exception as e:
+    except Exception:
         return fast_json({"error": "bad request"}, status=400)

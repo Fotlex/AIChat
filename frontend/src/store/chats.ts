@@ -3,6 +3,7 @@ import { shallowRef, triggerRef, computed, ref } from "vue";
 import apiClient from "@/api/apiClient";
 import type { Message, ChatState, Chat } from "@/types";
 import { useCharactersStore } from "./characters";
+import { useUserStore } from "./user";
 import { getChats } from "@/api/chatsApi";
 
 const MAX_CACHE_SIZE = 5;
@@ -160,40 +161,79 @@ export const useChatsStore = defineStore("chats", () => {
     triggerRef(chatCache);
 
     try {
-      const { data } = await apiClient.post<{
-        id: number;
-        chat_id: number;
-        ai_message: Message;
-      }>(`/chats/character/${state.characterId}/send/`, {
-        content: msg.content,
-      });
+      const token = localStorage.getItem("access_token");
+      const response = await fetch(
+        `/api/v1/chats/character/${state.characterId}/send/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ content: msg.content }),
+        },
+      );
 
-      msg.id = data.id;
+      if (!response.ok) {
+        if (response.status === 402) alert("Недостаточно кристаллов!");
+        throw new Error("Network response was not ok");
+      }
+
       msg.is_pending = false;
 
-      let updatedMessages = [...state.messages];
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-      if (data.ai_message) {
-        updatedMessages.push(data.ai_message);
+      let aiMessage: Message | null = null;
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() || "";
+
+          for (const part of parts) {
+            if (part.startsWith("data: ")) {
+              const dataStr = part.replace("data: ", "");
+              try {
+                const data = JSON.parse(dataStr);
+
+                if (data.type === "init") {
+                  msg.id = data.user_msg.id;
+                  state.chatId = data.chat_id;
+
+                  aiMessage = {
+                    id: data.ai_msg_id,
+                    role: "assistant",
+                    content: "",
+                    created_at: new Date().toISOString(),
+                  };
+                  state.messages = [...state.messages, aiMessage];
+                } else if (data.type === "chunk" && aiMessage) {
+                  aiMessage.content += data.text;
+                  state.messages = [...state.messages];
+                } else if (data.type === "done") {
+                  updateChatListLocally(
+                    state.characterId,
+                    state.chatId as string,
+                    aiMessage?.content || "",
+                  );
+                  const userStore = useUserStore();
+                  userStore.fetchUser();
+                }
+              } catch (e) {
+                console.error("Ошибка парсинга SSE", e);
+              }
+            }
+          }
+          triggerRef(chatCache);
+        }
       }
-
-      state.messages = updatedMessages;
-
-      if (!state.chatId) {
-        state.chatId = data.chat_id;
-        const charStore = useCharactersStore();
-        const char = charStore.currentList.items.find(
-          (c) => c.id === state.characterId,
-        );
-        if (char) char.chat_id = data.chat_id;
-      }
-
-      updateChatListLocally(
-        state.characterId,
-        data.chat_id,
-        data.ai_message?.content || msg.content,
-      );
-    } catch {
+    } catch (e) {
       msg.is_error = true;
     } finally {
       msg.is_pending = false;
@@ -227,7 +267,7 @@ export const useChatsStore = defineStore("chats", () => {
 
   function updateChatListLocally(
     characterId: number,
-    chatId: number,
+    chatId: string,
     lastMessageContent: string,
   ) {
     const existingIdx = chatsList.value.findIndex(
@@ -236,7 +276,13 @@ export const useChatsStore = defineStore("chats", () => {
 
     if (existingIdx !== -1) {
       const chat = chatsList.value.splice(existingIdx, 1)[0]!;
-      if (!chat.last_message) chat.last_message = { content: "" } as Message;
+      if (!chat.last_message)
+        chat.last_message = {
+          content: "",
+          id: 0,
+          role: "assistant",
+          created_at: "",
+        } as Message;
       chat.last_message.content = lastMessageContent;
       chat.created_at = new Date().toISOString();
       chatsList.value.unshift(chat);
@@ -250,7 +296,12 @@ export const useChatsStore = defineStore("chats", () => {
         chatsList.value.unshift({
           id: chatId,
           character: character,
-          last_message: { content: lastMessageContent } as Message,
+          last_message: {
+            content: lastMessageContent,
+            id: 0,
+            role: "assistant",
+            created_at: new Date().toISOString(),
+          } as Message,
           created_at: new Date().toISOString(),
         });
       }

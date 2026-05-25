@@ -73,20 +73,24 @@ onMounted(async () => {
 });
 
 watch(
-  () => messages.value.length,
-  (newLen, oldLen) => {
-    if (newLen === 0) return;
+  () => messages.value,
+  (_newVal, _oldVal) => {
+    if (chatsStore.isLoadingHistory || !parentRef.value) return;
 
-    if (oldLen === 0) {
-      nextTick(() => scrollToBottom("auto"));
-      return;
-    }
+    const el = parentRef.value;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
 
-    if (!chatsStore.isLoadingHistory) {
-      nextTick(() => scrollToBottom("smooth"));
-    }
+    nextTick(() => {
+      if (chatsStore.isSending) {
+        if (isNearBottom) {
+          scrollToBottom("auto");
+        }
+      } else {
+        scrollToBottom("smooth");
+      }
+    });
   },
-  { flush: "post" },
+  { deep: true, flush: "post" },
 );
 
 const handleScroll = (e: Event) => {
@@ -155,6 +159,8 @@ const formatTime = (iso: string) => {
           :style="{
             transform: `translateY(${virtualRow.start}px)`,
           }"
+          :data-index="virtualRow.index"
+          :ref="(el) => rowVirtualizer.measureElement(el as HTMLElement)"
         >
           <div
             v-if="messages[virtualRow.index]"

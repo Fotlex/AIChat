@@ -48,7 +48,7 @@ export interface Chat {
 
 export interface ChatState {
   characterId: number;
-  chatId: number | null;
+  chatId: string | null;
   messages: Message[];
   nextCursor: string | null;
   isFullyLoaded: boolean;
