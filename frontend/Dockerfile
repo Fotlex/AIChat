@@ -12,7 +12,7 @@ CMD ["npm", "run", "dev", "--", "--host"]
 # ================= PRODUCTION BUILD =================
 FROM base AS build
 COPY . .
-RUN npm run build
+RUN npx vite build
 
 FROM alpine:3.19 AS prod-exporter
 WORKDIR /app

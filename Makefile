@@ -84,7 +84,7 @@ SSL_DIR = $(shell pwd)/ssl
 prod-test-ssl:
 	@echo "Тестируем получение сертификата для $(DOMAIN)..."
 	-docker stop aichat-nginx
-	docker run -it --rm --name certbot \
+	docker run --rm --name certbot \
 		-p 80:80 \
 		-v $(SSL_DIR):/etc/letsencrypt \
 		certbot/certbot certonly --standalone \
@@ -95,7 +95,7 @@ prod-test-ssl:
 prod-get-ssl:
 	@echo "Получаем БОЕВОЙ сертификат для $(DOMAIN)..."
 	-docker stop aichat-nginx
-	docker run -it --rm --name certbot \
+	docker run --rm --name certbot \
 		-p 80:80 \
 		-v $(SSL_DIR):/etc/letsencrypt \
 		certbot/certbot certonly --standalone \
@@ -106,7 +106,7 @@ prod-get-ssl:
 prod-renew-ssl:
 	@echo "Обновляем сертификат..."
 	-docker stop aichat-nginx
-	docker run -it --rm --name certbot \
+	docker run --rm --name certbot \
 		-p 80:80 \
 		-v $(SSL_DIR):/etc/letsencrypt \
 		certbot/certbot renew --standalone
