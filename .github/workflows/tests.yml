@@ -82,7 +82,7 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            cd /home/fotlex/Documents/PyProjects/AIChat
+            cd AIChat
             
             PREV_COMMIT=$(git rev-parse HEAD)
             
