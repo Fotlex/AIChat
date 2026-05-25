@@ -30,5 +30,4 @@ class TestCharacterAPI:
         response = await api_client.get("/api/v1/characters/", headers=auth_headers)
         assert response.status_code == 200
         data = orjson.loads(response.content)
-        
         assert len(data["items"]) >= 1

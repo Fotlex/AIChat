@@ -1,7 +1,7 @@
 import pytest
 from django.test import AsyncClient
-from apps.core.models import User, LLMConfiguration
-from apps.core.services.auth import hash_password_async
+from apps.core.models import User
+from apps.core.services.auth import hash_password_async, generate_tokens
 
 @pytest.fixture
 async def api_client():
@@ -10,7 +10,7 @@ async def api_client():
 @pytest.fixture
 async def test_user(db):
     hashed_pw = await hash_password_async("password123")
-    user, created = await User.objects.aget_or_create(
+    user, _ = await User.objects.aupdate_or_create(
         username="test_dev",
         defaults={"password_hash": hashed_pw, "balance": 1000}
     )
@@ -18,6 +18,5 @@ async def test_user(db):
 
 @pytest.fixture
 async def auth_headers(test_user):
-    from apps.core.services.auth import generate_tokens
     tokens = generate_tokens(test_user.id)
-    return {"HTTP_AUTHORIZATION": f"Bearer {tokens['access']}"}
+    return {"Authorization": f"Bearer {tokens['access']}"}
