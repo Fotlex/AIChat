@@ -100,4 +100,3 @@ jobs:
             
             make prod-static
             
-            docker image prune -f
