@@ -7,26 +7,26 @@ const store = useCharactersStore();
 const gliderStyle = computed(() => {
   return {
     transform:
-      store.activeGender === "F" ? "translateX(0%)" : "translateX(100%)",
+      store.activeTab === "all" ? "translateX(0%)" : "translateX(100%)",
   };
 });
 </script>
 
 <template>
   <div class="filter-wrapper">
-    <div class="gender-filter">
+    <div class="tab-filter">
       <span class="glider" :style="gliderStyle"></span>
       <button
-        :class="{ active: store.activeGender === 'F' }"
-        @click="store.setGender('F')"
+        :class="{ active: store.activeTab === 'all' }"
+        @click="store.setTab('all')"
       >
-        Девушки
+        Все
       </button>
       <button
-        :class="{ active: store.activeGender === 'M' }"
-        @click="store.setGender('M')"
+        :class="{ active: store.activeTab === 'favorites' }"
+        @click="store.setTab('favorites')"
       >
-        Парни
+        Избранные
       </button>
     </div>
   </div>
@@ -37,7 +37,7 @@ const gliderStyle = computed(() => {
   padding: 10px 16px;
   width: 100%;
 }
-.gender-filter {
+.tab-filter {
   display: flex;
   position: relative;
   background-color: #2c2c2e;
@@ -45,7 +45,7 @@ const gliderStyle = computed(() => {
   padding: 4px;
   width: 100%;
 }
-.gender-filter button {
+.tab-filter button {
   flex: 1;
   padding: 8px 0;
   background: none;
@@ -57,7 +57,7 @@ const gliderStyle = computed(() => {
   z-index: 2;
   transition: color 0.3s ease;
 }
-.gender-filter button.active {
+.tab-filter button.active {
   color: white;
 }
 .glider {

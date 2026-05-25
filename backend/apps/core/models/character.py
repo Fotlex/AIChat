@@ -40,3 +40,15 @@ class Character(TimeStampedMixin):
 
     def __str__(self):
         return self.name
+
+
+class FavoriteCharacter(TimeStampedMixin):
+    user = models.ForeignKey("User", on_delete=models.CASCADE)
+    character = models.ForeignKey("Character", on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "favorite_characters"
+        unique_together = ("user", "character")
+        indexes = [
+            models.Index(fields=["user", "-created_at"]),
+        ]

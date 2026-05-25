@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import type { Character } from "@/types";
 
 const props = defineProps<{
@@ -7,11 +8,27 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "select", id: number): void;
+  (e: "like", id: number): void;
 }>();
+
+const isAnimating = ref(false);
 
 function formatLikes(count: number): string {
   if (count >= 1000) return (count / 1000).toFixed(1) + "K";
   return count.toString();
+}
+
+function handleLikeClick(e: Event) {
+  e.stopPropagation();
+
+  if (!props.character || isAnimating.value) return;
+
+  isAnimating.value = true;
+  emit("like", props.character.id);
+
+  setTimeout(() => {
+    isAnimating.value = false;
+  }, 300);
 }
 </script>
 
@@ -26,10 +43,15 @@ function formatLikes(count: number): string {
     />
 
     <div class="card-overlay">
-      <div class="likes-badge">
+      <button
+        class="likes-badge"
+        :class="{ 'is-liked': character.is_favorite, animating: isAnimating }"
+        @click="handleLikeClick"
+        aria-label="Toggle Like"
+      >
         <i-local-heart class="heart-icon" />
         <span>{{ formatLikes(character.likes_count) }}</span>
-      </div>
+      </button>
 
       <div class="card-info">
         <div class="card-name">{{ character.name }}</div>
@@ -58,14 +80,12 @@ function formatLikes(count: number): string {
   height: 100%;
   object-fit: cover;
   display: block;
+  will-change: transform;
 }
 
 .card-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: linear-gradient(
     180deg,
     rgba(0, 0, 0, 0) 50%,
@@ -83,20 +103,40 @@ function formatLikes(count: number): string {
   right: 10px;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 12px;
-  padding: 4px 8px;
+  padding: 6px 10px;
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 12px;
   font-weight: 600;
   color: #fff;
+  cursor: pointer;
+  transform-origin: center;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  will-change: transform;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .heart-icon {
   width: 14px;
   height: 14px;
+  fill: transparent;
+  stroke: #fff;
+  stroke-width: 2px;
+  transition:
+    fill 0.2s,
+    stroke 0.2s;
+}
+
+.likes-badge.is-liked .heart-icon {
   fill: #ff4d4d;
+  stroke: #ff4d4d;
+}
+
+.likes-badge.animating {
+  transform: scale(0.85);
 }
 
 .card-name {
@@ -113,5 +153,13 @@ function formatLikes(count: number): string {
   overflow: hidden;
   text-overflow: ellipsis;
   opacity: 0.9;
+}
+
+.card-placeholder {
+  background: transparent;
+  height: 100%;
+  width: 100%;
+  pointer-events: none;
+  visibility: hidden;
 }
 </style>

@@ -3,7 +3,7 @@ import { computed, ref, onMounted, watch } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { useCharactersStore } from "@/store/characters";
 import CharacterCard from "./CharacterCard.vue";
-import GenderFilter from "./GenderFilter.vue";
+import TabFilter from "./TabFilter.vue";
 import SortDropdown from "./SortDropdown.vue";
 import { useRouter } from "vue-router";
 
@@ -11,7 +11,7 @@ const store = useCharactersStore();
 const router = useRouter();
 const parentRef = ref<HTMLElement | null>(null);
 
-const listKey = computed(() => `${store.activeGender}-${store.activeSort}`);
+const listKey = computed(() => `${store.activeTab}-${store.activeSort}`);
 
 onMounted(() => {
   store.checkAndLoad();
@@ -49,7 +49,7 @@ watch(
 <template>
   <div ref="parentRef" class="virtual-scroll-container">
     <div class="scrolling-header">
-      <GenderFilter />
+      <TabFilter />
       <SortDropdown />
     </div>
 
@@ -80,11 +80,13 @@ watch(
             class="row-item"
             :character="store.chunkedItems[virtualRow.index]?.[0] ?? null"
             @select="handleSelect"
+            @like="store.toggleLike"
           />
           <CharacterCard
             class="row-item"
             :character="store.chunkedItems[virtualRow.index]?.[1] ?? null"
             @select="handleSelect"
+            @like="store.toggleLike"
           />
         </div>
       </div>

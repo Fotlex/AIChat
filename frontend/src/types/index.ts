@@ -8,8 +8,10 @@ export interface Character {
   author_id: number | null;
   author_name: string | null;
   likes_count: number;
+  is_favorite: boolean;
   greeting_message: string | null;
   chat_id: string | null;
+  created_at?: string;
 }
 
 export interface User {
