@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
-import CharacterCard from '../CharacterCard.vue';
+import CharacterCard from "@/components/CharacterCard.vue";
 
 const globalConfig = {
   global: {
