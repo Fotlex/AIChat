@@ -109,6 +109,7 @@ const submit = async () => {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(80, 80, 80, 0.5);
 }
+
 .logo {
   display: flex;
   align-items: center;
