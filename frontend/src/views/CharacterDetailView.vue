@@ -88,6 +88,7 @@ const openAuthor = () => {
 <style scoped>
 .preview-page {
   height: 100vh;
+  height: 100dvh;
   background: #09090b;
   color: white;
   display: flex;
@@ -193,6 +194,7 @@ const openAuthor = () => {
 }
 
 .footer-actions {
+  flex-shrink: 0;
   padding: 20px 0 calc(20px + env(safe-area-inset-bottom));
   background: #09090b;
 }

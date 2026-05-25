@@ -153,10 +153,12 @@ const saveName = async () => {
 <style scoped>
 .profile-page {
   height: 100vh;
+  height: 100dvh;
   background: #0e0e10;
   color: white;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 
   width: 100%;
   max-width: var(--app-max-width);
@@ -165,7 +167,9 @@ const saveName = async () => {
   border-left: 1px solid rgba(255, 255, 255, 0.03);
   border-right: 1px solid rgba(255, 255, 255, 0.03);
 }
+
 .top-bar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;

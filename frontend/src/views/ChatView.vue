@@ -202,7 +202,7 @@ const formatTime = (iso: string) => {
       <div class="chat-footer-inner">
         <div class="input-wrapper">
           <textarea
-            v-model="messageInput"
+            @input="messageInput = ($event.target as HTMLTextAreaElement).value"
             placeholder="Написать..."
             class="message-input"
             rows="1"
@@ -226,9 +226,12 @@ const formatTime = (iso: string) => {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   background: #0e0e10;
+  overflow: hidden;
   transform: translateZ(0);
 }
+
 .messages-container {
   flex: 1;
   overflow-y: auto;
@@ -241,7 +244,9 @@ const formatTime = (iso: string) => {
   max-width: var(--app-max-width);
   margin: 0 auto;
 }
+
 .chat-footer {
+  flex-shrink: 0;
   padding: 10px;
   background: #18181b;
   border-top: 1px solid rgba(255, 255, 255, 0.05);

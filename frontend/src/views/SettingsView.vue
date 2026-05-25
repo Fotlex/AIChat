@@ -78,12 +78,13 @@ const logout = () => {
             {{ userStore.currentUser?.username?.[0]?.toUpperCase() }}
           </div>
           <div class="profile-main">
-            <div class="username">@{{ userStore.currentUser?.username }}</div>
-            <div class="balance-tag">
-              <i-local-crystal />
-              <span>{{ userStore.balance }} 💎</span>
+            <div class="user-header">
+              <div class="username">@{{ userStore.currentUser?.username }}</div>
+              <div class="balance-tag">
+                <span>{{ userStore.balance }} 💎</span>
+              </div>
             </div>
-            <div class="open-profile-hint">Открыть профиль →</div>
+            <div class="open-profile-btn">Открыть профиль →</div>
           </div>
         </div>
       </div>
@@ -117,7 +118,9 @@ const logout = () => {
               >
                 <div class="option-info">
                   <div class="option-name">{{ llm.name }}</div>
-                  <div class="option-price">{{ llm.cost }} 💎 за сообщение</div>
+                  <div class="option-price">
+                    {{ llm.cost_per_request }} 💎 за сообщение
+                  </div>
                 </div>
                 <div
                   class="option-check"
@@ -213,7 +216,12 @@ const logout = () => {
 .profile-main {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+}
+.user-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .username {
   font-size: 18px;
@@ -221,17 +229,27 @@ const logout = () => {
   color: #fff;
 }
 .balance-tag {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   color: #81b2ff;
   font-size: 14px;
   font-weight: 600;
+  background: rgba(129, 178, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 8px;
 }
-.open-profile-hint {
+.open-profile-btn {
   font-size: 12px;
-  color: #007aff;
+  color: #fff;
   font-weight: 600;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 6px 12px;
+  border-radius: 12px;
+  display: inline-block;
+  margin-top: 6px;
+  width: max-content;
+  transition: background 0.2s;
+}
+.profile-card:hover .open-profile-btn {
+  background: rgba(255, 255, 255, 0.25);
 }
 .accordion {
   background: rgba(255, 255, 255, 0.06);
