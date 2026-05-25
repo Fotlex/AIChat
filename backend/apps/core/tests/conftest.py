@@ -1,4 +1,5 @@
 import pytest
+import uuid
 from django.test import AsyncClient
 from apps.core.models import User
 from apps.core.services.auth import hash_password_async, generate_tokens
@@ -9,10 +10,12 @@ async def api_client():
 
 @pytest.fixture
 async def test_user(db):
+    unique_name = f"user_{uuid.uuid4().hex[:8]}"
     hashed_pw = await hash_password_async("password123")
-    user, _ = await User.objects.aupdate_or_create(
-        username="test_dev",
-        defaults={"password_hash": hashed_pw, "balance": 1000}
+    user = await User.objects.acreate(
+        username=unique_name,
+        password_hash=hashed_pw,
+        balance=1000
     )
     return user
 
