@@ -1,4 +1,4 @@
-name: Run Tests
+name: CI/CD Pipeline
 
 on:
   push:
@@ -9,8 +9,6 @@ on:
 jobs:
   backend-tests:
     runs-on: ubuntu-latest
-    
-    # Запускаем временную базу данных прямо в GitHub
     services:
       postgres:
         image: postgres:17-alpine
@@ -78,3 +76,28 @@ jobs:
       - name: Run Vitest
         working-directory: ./frontend
         run: npm run test -- --run
+
+  deploy:
+    needs: [backend-tests, frontend-tests]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+
+          script: |
+            cd AIChat
+            git pull origin ${{ github.ref_name }}
+            
+            make prod-up
+            
+            make prod-migrate
+            
+            make prod-static
+            
+            docker image prune -f
