@@ -10,10 +10,9 @@ async def api_client():
 @pytest.fixture
 async def test_user(db):
     hashed_pw = await hash_password_async("password123")
-    user = await User.objects.acreate(
+    user, created = await User.objects.auget_or_create(
         username="test_dev",
-        password_hash=hashed_pw,
-        balance=1000
+        defaults={"password_hash": hashed_pw, "balance": 1000}
     )
     return user
 
