@@ -23,22 +23,17 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install Poetry
         run: curl -sSL https://install.python-poetry.org | python3 -
-
       - name: Install Dependencies
         working-directory: ./backend
         run: poetry install --no-root
-
       - name: Run Pytest
         working-directory: ./backend
         env:
@@ -61,18 +56,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: './frontend/package-lock.json'
-
       - name: Install Dependencies
         working-directory: ./frontend
         run: npm install
-
       - name: Run Vitest
         working-directory: ./frontend
         run: npm run test -- --run
@@ -89,14 +81,21 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-
           script: |
-            cd AIChat
+            cd /home/fotlex/Documents/PyProjects/AIChat
+            
+            PREV_COMMIT=$(git rev-parse HEAD)
+            
             git pull origin ${{ github.ref_name }}
             
+            # git diff --quiet возвращает 0, если изменений НЕТ
+            if git diff --quiet $PREV_COMMIT HEAD -- frontend/; then
+              echo ">>> [INFO] Фронтенд не менялся. Пропускаем сборку статики."
+            else
+              echo ">>> [BUILD] Обнаружены изменения во фронтенде. Запускаем билд..."
+              make prod-build-front
+            fi
+            
             make prod-up
-            
             make prod-migrate
-            
             make prod-static
-            
