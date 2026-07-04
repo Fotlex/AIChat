@@ -1,6 +1,6 @@
 from django.urls import include, path
 
-from .auth import login_view, refresh_token_view, register_view
+from .auth import refresh_token_view, telegram_auth_view
 from .character import (
     character_detail_view,
     character_list_view,
@@ -19,8 +19,7 @@ from .user import (
 )
 
 auth_patterns = [
-    path("register/", register_view),
-    path("login/", login_view),
+    path("telegram/", telegram_auth_view),
     path("refresh/", refresh_token_view),
 ]
 

@@ -3,7 +3,7 @@ from .base import TimeStampedMixin
 
 
 class User(TimeStampedMixin):
-    id = models.BigAutoField(primary_key=True)
+    id = models.BigIntegerField("Telegram ID", primary_key=True)
     preferred_llm = models.ForeignKey(
         "LLMConfiguration", 
         on_delete=models.SET_NULL, 
@@ -13,7 +13,6 @@ class User(TimeStampedMixin):
     username = models.CharField(
         "Имя пользователя", max_length=64, unique=True, db_index=True
     )
-    password_hash = models.CharField("Хэш пароля", max_length=255)
 
     balance = models.BigIntegerField("Баланс", default=0)
     is_active = models.BooleanField("Активен", default=True)

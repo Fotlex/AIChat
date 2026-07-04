@@ -16,10 +16,10 @@ COPY pyproject.toml poetry.lock ./
 
 # ================= DEVELOPMENT =================
 FROM base AS dev
-RUN --mount=type=cache,id=aichat-poetry,target=/opt/poetry_cache \
+RUN id=aichat-poetry,target=/opt/poetry_cache \
     poetry install --no-root --no-interaction --no-ansi
 
 # ================= PRODUCTION =================
-FROM base AS prod
-RUN poetry install --only main --no-root --no-interaction --no-ansi
+FROM base AS dev
+RUN poetry install --no-root --no-interaction --no-ansi
 COPY . .

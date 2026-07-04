@@ -1,20 +1,39 @@
+import hmac
+import hashlib
 from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qsl
 
 import jwt
-from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.contrib.auth.hashers import check_password, make_password
 
+def validate_telegram_init_data(init_data: str) -> dict | None:
+    try:
+        parsed_data = dict(parse_qsl(init_data))
+        if 'hash' not in parsed_data:
+            return None
 
-@sync_to_async
-def hash_password_async(raw_password: str) -> str:
-    return make_password(raw_password)
+        hash_value = parsed_data.pop('hash')
+        data_check_string = '\n'.join(
+            f"{k}={v}" for k, v in sorted(parsed_data.items())
+        )
 
+        secret_key = hmac.new(
+            b"WebAppData", 
+            settings.TELEGRAM_BOT_TOKEN.encode(), 
+            hashlib.sha256
+        ).digest()
+        
+        calculated_hash = hmac.new(
+            secret_key, 
+            data_check_string.encode(), 
+            hashlib.sha256
+        ).hexdigest()
 
-@sync_to_async
-def verify_password_async(raw_password: str, encoded_password: str) -> bool:
-    return check_password(raw_password, encoded_password)
-
+        if calculated_hash == hash_value:
+            return parsed_data
+        return None
+    except Exception:
+        return None
 
 def generate_tokens(user_id: int) -> dict:
     now = datetime.now(timezone.utc)

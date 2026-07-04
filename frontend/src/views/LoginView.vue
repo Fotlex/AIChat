@@ -1,49 +1,33 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import axios from "axios";
 
 const router = useRouter();
-const isLogin = ref(true);
-const username = ref("");
-const password = ref("");
 const errorMsg = ref("");
-const isLoading = ref(false);
 
-const gliderStyle = computed(() => {
-  return {
-    transform: isLogin.value ? "translateX(0%)" : "translateX(100%)",
-  };
+onMounted(async () => {
+  const tg = (window as any).Telegram?.WebApp;
+  
+  if (tg && tg.initData) {
+    tg.ready();
+    tg.expand();
+
+    try {
+      const res = await axios.post("/api/v1/auth/telegram/", {
+        initData: tg.initData,
+      });
+
+      localStorage.setItem("access_token", res.data.access);
+      localStorage.setItem("refresh_token", res.data.refresh);
+      router.push("/");
+    } catch (e: any) {
+      errorMsg.value = e.response?.data?.error || "Ошибка авторизации";
+    }
+  } else {
+    errorMsg.value = "Пожалуйста, откройте приложение внутри Telegram.";
+  }
 });
-
-const submit = async () => {
-  if (!username.value || !password.value) {
-    errorMsg.value = "Заполните все поля";
-    return;
-  }
-
-  isLoading.value = true;
-  errorMsg.value = "";
-
-  try {
-    const endpoint = isLogin.value
-      ? "/api/v1/auth/login/"
-      : "/api/v1/auth/register/";
-    const res = await axios.post(endpoint, {
-      username: username.value,
-      password: password.value,
-    });
-
-    localStorage.setItem("access_token", res.data.access);
-    localStorage.setItem("refresh_token", res.data.refresh);
-
-    router.push("/");
-  } catch (e: any) {
-    errorMsg.value = e.response?.data?.error || "Произошла ошибка";
-  } finally {
-    isLoading.value = false;
-  }
-};
 </script>
 
 <template>
@@ -54,38 +38,13 @@ const submit = async () => {
         <h2>AIChat</h2>
       </div>
 
-      <div class="tabs">
-        <span class="glider" :style="gliderStyle"></span>
-        <button :class="{ active: isLogin }" @click="isLogin = true">
-          Вход
-        </button>
-        <button :class="{ active: !isLogin }" @click="isLogin = false">
-          Регистрация
-        </button>
+      <div class="status-container">
+        <div v-if="!errorMsg" class="loader">
+          <div class="spinner"></div>
+          <p>Вход через Telegram...</p>
+        </div>
+        <p v-else class="error-text">{{ errorMsg }}</p>
       </div>
-
-      <form @submit.prevent="submit" class="auth-form">
-        <input
-          v-model="username"
-          type="text"
-          placeholder="Логин"
-          class="input-field"
-        />
-        <input
-          v-model="password"
-          type="password"
-          placeholder="Пароль"
-          class="input-field"
-        />
-
-        <p v-if="errorMsg" class="error-text">{{ errorMsg }}</p>
-
-        <button type="submit" class="submit-btn" :disabled="isLoading">
-          {{
-            isLoading ? "Загрузка..." : isLogin ? "Войти" : "Создать аккаунт"
-          }}
-        </button>
-      </form>
     </div>
   </div>
 </template>
@@ -106,92 +65,49 @@ const submit = async () => {
   border-radius: 20px;
   width: 90%;
   max-width: 400px;
+  text-align: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(80, 80, 80, 0.5);
 }
-
 .logo {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   margin-bottom: 25px;
+  color: white;
 }
 .logo-icon {
   width: 32px;
   height: 32px;
   color: #81b2ff;
 }
-.tabs {
-  display: flex;
-  position: relative;
-  background: #2c2c2e;
-  border-radius: 12px;
-  padding: 4px;
-  margin-bottom: 20px;
-}
-.tabs button {
-  flex: 1;
-  padding: 10px 0;
-  background: none;
-  border: none;
-  color: #999;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  z-index: 2;
-  transition: color 0.3s ease;
-}
-.tabs button.active {
+.status-container {
   color: white;
-}
-.glider {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  height: calc(100% - 8px);
-  width: calc((100% - 8px) / 2);
-  background-color: #007aff;
-  border-radius: 9px;
-  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  z-index: 1;
-  will-change: transform; 
-}
-.auth-form {
+  min-height: 80px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  justify-content: center;
 }
-.input-field {
-  background: #1c1c1e;
-  border: 1px solid #3a3a3c;
-  color: white;
-  padding: 14px;
-  border-radius: 12px;
-  font-size: 15px;
-  outline: none;
+.loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
 }
-.input-field:focus {
-  border-color: #007aff;
-}
-.submit-btn {
-  background: #7b61ff;
-  color: white;
-  border: none;
-  padding: 14px;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 600;
-  margin-top: 10px;
-  cursor: pointer;
-}
-.submit-btn:disabled {
-  opacity: 0.7;
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #7b61ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 .error-text {
   color: #ff4d4d;
-  font-size: 13px;
-  text-align: center;
-  margin: 0;
+  font-size: 14px;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style>
