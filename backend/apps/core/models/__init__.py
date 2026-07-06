@@ -4,6 +4,7 @@ from .character import Character
 from .chat import Conversation, Message
 from .payment import Tariff, Transaction
 from .promocode import Promocode, PromocodeUsage
+from .button import MainButton, OtherButton
 
 __all__ = [
     "User",
@@ -15,4 +16,6 @@ __all__ = [
     "Transaction",
     "Promocode",
     "PromocodeUsage",
+    "MainButton",
+    "OtherButton",
 ]

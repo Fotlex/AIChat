@@ -109,6 +109,7 @@ ADMIN_REORDER = [
     {"label": "👥 Пользователи", "models": ["core.User"]},
     {"label": "🎭 Персонажи", "models": ["core.Character"]},
     {"label": "💬 Чаты и Сообщения", "models": ["core.Conversation", "core.Message"]},
+    {"label": "🔋 Кнопки в боте", "models": ["core.MainButton", "core.OtherButton"]},
     {"label": "⚙️ Настройки LLM", "models": ["core.LLMConfiguration"]},
     {"label": "💳 Платежи и Промокоды", "models": [
         "core.Tariff", 
