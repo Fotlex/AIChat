@@ -7,7 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from apps.core.models import User
 from apps.core.services.auth import generate_tokens, validate_telegram_init_data
-
+from apps.core.services.referral import process_referral_async
 
 @csrf_exempt
 async def telegram_auth_view(request):
@@ -33,7 +33,17 @@ async def telegram_auth_view(request):
         tg_id = tg_user.get("id")
         tg_username = tg_user.get("username")
 
+        start_param = validated_data.get("start_param", "")
+        referrer_id = None
+        if start_param:
+            try:
+                clean_param = start_param.replace("ref_", "")
+                referrer_id = int(clean_param)
+            except ValueError:
+                pass
+
         user = await User.objects.filter(id=tg_id).afirst()
+        is_new_user = False
 
         if not user:
             base_username = tg_username if tg_username else f"user_{tg_id}"
@@ -44,8 +54,12 @@ async def telegram_auth_view(request):
                     username=base_username[:64],
                     balance=1000
                 )
+                is_new_user = True
             except IntegrityError:
                 user = await User.objects.filter(id=tg_id).afirst()
+
+        if is_new_user and referrer_id:
+            await process_referral_async(referred_id=user.id, referrer_id=referrer_id)
 
         tokens = generate_tokens(user.id)
         return fast_json(tokens, status=200)

@@ -111,9 +111,13 @@ ADMIN_REORDER = [
     {"label": "💬 Чаты и Сообщения", "models": ["core.Conversation", "core.Message"]},
     {"label": "🔋 Кнопки в боте", "models": ["core.MainButton", "core.OtherButton"]},
     {"label": "⚙️ Настройки LLM", "models": ["core.LLMConfiguration"]},
-    {"label": "💳 Платежи и Промокоды", "models": [
-        "core.Tariff", 
-        "core.Transaction", 
-        "core.Promocode"
-    ]},
+    {
+        "label": "💳 Платежи и Промокоды",
+        "models": [
+            "core.Tariff",
+            "core.Transaction",
+            "core.Promocode",
+            "core.Referral",
+        ],
+    },
 ]

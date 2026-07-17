@@ -20,6 +20,7 @@ export interface User {
   username: string | null;
   balance: number;
   preferred_llm_id?: number | null;
+  referrals_count?: number;
 }
 
 export interface Tariff {

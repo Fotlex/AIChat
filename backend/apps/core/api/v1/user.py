@@ -9,6 +9,7 @@ from apps.core.models import (
     LLMConfiguration,
     Promocode,
     PromocodeUsage,
+    Referral,
     User,
 )
 
@@ -32,6 +33,9 @@ async def settings_info_view(request):
         .values("username", "balance", "preferred_llm_id")
         .afirst()
     )
+
+    referrals_count = await Referral.objects.filter(referrer_id=request.user_id).acount()
+    user_data["referrals_count"] = referrals_count
 
     my_characters = [
         {

@@ -34,6 +34,7 @@ export const useUserStore = defineStore("user", () => {
           if (currentUser.value) {
             currentUser.value.preferred_llm_id = data.user.preferred_llm_id;
             currentUser.value.username = data.user.username;
+            currentUser.value.referrals_count = data.user.referrals_count;
           }
         })
         .catch(() => {});
@@ -47,6 +48,7 @@ export const useUserStore = defineStore("user", () => {
       if (currentUser.value) {
         currentUser.value.preferred_llm_id = data.user.preferred_llm_id;
         currentUser.value.username = data.user.username;
+        currentUser.value.referrals_count = data.user.referrals_count;
       }
       isSettingsLoaded.value = true;
     } catch (e) {}
