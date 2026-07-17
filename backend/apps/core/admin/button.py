@@ -1,7 +1,9 @@
 from django.contrib import admin
 from django.shortcuts import redirect
 from django.urls import reverse
-from ..models import MainButton, OtherButton
+
+from ..models import MainButton
+
 
 class MainButtonAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
@@ -17,7 +19,7 @@ class MainButtonAdmin(admin.ModelAdmin):
             obj = self.model.objects.first()
             url = reverse(
                 f"admin:{self.model._meta.app_label}_{self.model._meta.model_name}_change",
-                args=[obj.pk]
+                args=[obj.pk],
             )
             return redirect(url)
         return super().changelist_view(request, extra_context)

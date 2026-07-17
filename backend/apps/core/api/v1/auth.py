@@ -9,6 +9,7 @@ from apps.core.models import User
 from apps.core.services.auth import generate_tokens, validate_telegram_init_data
 from apps.core.services.referral import process_referral_async
 
+
 @csrf_exempt
 async def telegram_auth_view(request):
     if request.method != "POST":
@@ -47,12 +48,10 @@ async def telegram_auth_view(request):
 
         if not user:
             base_username = tg_username if tg_username else f"user_{tg_id}"
-            
+
             try:
                 user = await User.objects.acreate(
-                    id=tg_id,
-                    username=base_username[:64],
-                    balance=1000
+                    id=tg_id, username=base_username[:64], balance=1000
                 )
                 is_new_user = True
             except IntegrityError:

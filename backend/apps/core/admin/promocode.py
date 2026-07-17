@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils import timezone
-from ..models.promocode import Promocode, PromocodeUsage
+
+from ..models.promocode import PromocodeUsage
 
 
 class PromocodeUsageInline(admin.TabularInline):
@@ -19,14 +20,10 @@ class PromocodeAdmin(admin.ModelAdmin):
     search_fields = ("code",)
     readonly_fields = ("current_uses",)
     inlines = [PromocodeUsageInline]
-    
+
     fieldsets = (
-        ("Основные настройки", {
-            "fields": ("code", "reward", "is_active")
-        }),
-        ("Лимиты и сроки", {
-            "fields": ("max_uses", "current_uses", "expires_at")
-        }),
+        ("Основные настройки", {"fields": ("code", "reward", "is_active")}),
+        ("Лимиты и сроки", {"fields": ("max_uses", "current_uses", "expires_at")}),
     )
 
     @admin.display(description="Использовано")
@@ -48,7 +45,7 @@ class PromocodeUsageAdmin(admin.ModelAdmin):
     list_display = ("user", "promocode", "created_at")
     list_filter = ("promocode", "created_at")
     search_fields = ("user__username", "promocode__code")
-    
+
     def has_add_permission(self, request):
         return False
 

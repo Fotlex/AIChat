@@ -1,10 +1,12 @@
 import orjson
+from config.utils import R400, fast_json
 from django.db.models import F
 from django.views.decorators.csrf import csrf_exempt
-from config.utils import R400, fast_json
+
 from apps.core.decorators import jwt_auth
 from apps.core.models import Tariff, Transaction, User
 from apps.core.services.payment import create_yookassa_payment, get_yookassa_payment
+
 
 @jwt_auth(methods=["GET"])
 async def tariff_list_view(request):
@@ -16,7 +18,9 @@ async def tariff_list_view(request):
             "reward": t["reward"],
             "photo": f"/media/{t['photo']}" if t["photo"] else None,
         }
-        async for t in Tariff.objects.filter(is_active=True).order_by("sort_order", "cost").values()
+        async for t in Tariff.objects.filter(is_active=True)
+        .order_by("sort_order", "cost")
+        .values()
     ]
     return fast_json(tariffs)
 
@@ -38,20 +42,24 @@ async def create_payment_view(request):
         tariff_id=tariff.id,
         amount=tariff.cost,
         reward=tariff.reward,
-        status=Transaction.StatusChoices.PENDING
+        status=Transaction.StatusChoices.PENDING,
     )
 
     description = f"Оплата тарифа «{tariff.name}» (ID: {request.user_id})"
-    yk_payment = await create_yookassa_payment(float(tariff.cost), transaction.id, description)
+    yk_payment = await create_yookassa_payment(
+        float(tariff.cost), transaction.id, description
+    )
 
     await Transaction.objects.filter(id=transaction.id).aupdate(
         provider_payment_id=yk_payment.id
     )
 
-    return fast_json({
-        "transaction_id": str(transaction.id),
-        "payment_url": yk_payment.confirmation.confirmation_url
-    })
+    return fast_json(
+        {
+            "transaction_id": str(transaction.id),
+            "payment_url": yk_payment.confirmation.confirmation_url,
+        }
+    )
 
 
 @csrf_exempt
@@ -61,7 +69,7 @@ async def yookassa_webhook_view(request):
 
     try:
         event_json = orjson.loads(request.body)
-        
+
         yk_payment_id = event_json.get("object", {}).get("id")
         event_type = event_json.get("event")
 
@@ -82,12 +90,12 @@ async def yookassa_webhook_view(request):
 
         if actual_payment.status == "succeeded" and event_type == "payment.succeeded":
             await User.objects.filter(id=transaction.user_id).aupdate(
-                balance=F('balance') + transaction.reward
+                balance=F("balance") + transaction.reward
             )
             await Transaction.objects.filter(id=transaction.id).aupdate(
                 status=Transaction.StatusChoices.SUCCESS
             )
-        
+
         elif actual_payment.status == "canceled" and event_type == "payment.canceled":
             await Transaction.objects.filter(id=transaction.id).aupdate(
                 status=Transaction.StatusChoices.FAILED
