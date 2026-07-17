@@ -263,6 +263,8 @@ const logout = () => {
   border: 1px solid rgba(255, 255, 255, 0.05);
   cursor: pointer;
   transition: transform 0.1s;
+  width: 100%;
+  overflow: hidden;
 }
 .profile-card:active {
   transform: scale(0.98);
@@ -284,16 +286,23 @@ const logout = () => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1;
+  min-width: 0;
 }
 .user-header {
   display: flex;
   align-items: center;
   gap: 12px;
+  justify-content: space-between;
+  width: 100%;
 }
 .username {
   font-size: 18px;
   font-weight: 700;
   color: #fff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .balance-tag {
   color: #81b2ff;
@@ -302,6 +311,8 @@ const logout = () => {
   background: rgba(129, 178, 255, 0.1);
   padding: 2px 8px;
   border-radius: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .open-profile-btn {
   font-size: 12px;
