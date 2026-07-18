@@ -1,4 +1,3 @@
-from .button import MainButton, OtherButton
 from .character import Character
 from .chat import Conversation, Message
 from .llm import LLMConfiguration
@@ -18,6 +17,4 @@ __all__ = [
     "Transaction",
     "Promocode",
     "PromocodeUsage",
-    "MainButton",
-    "OtherButton",
 ]

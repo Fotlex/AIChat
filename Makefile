@@ -12,8 +12,8 @@ MANAGE_DEV = $(DC_DEV) exec backend python manage.py
 MANAGE_PROD = $(DC_PROD) exec backend python manage.py
 
 .PHONY: dev-build dev-up dev-down dev-stop dev-restart dev-logs dev-shell \
-        dev-startapp dev-makemigrations dev-migrate dev-superuser dev-static \
-		dev-test-backend dev-test-frontend dev-test-all
+        dev-startapp dev-makemigrations dev-migrate dev-webhook-set dev-webhook-delete \
+		dev-superuser dev-static dev-test-backend dev-test-frontend dev-test-all
 
 # ================= DEV =================
 
@@ -47,8 +47,11 @@ dev-makemigrations:
 dev-migrate:
 	$(MANAGE_DEV) migrate
 
-dev-webhook:
+dev-webhook-set:
 	$(MANAGE_DEV) set_webhook
+
+dev-webhook-delete:
+	$(MANAGE_DEV) set_webhook --delete
 
 dev-superuser:
 	$(MANAGE_DEV) createsuperuser
@@ -85,6 +88,12 @@ prod-static:
 
 prod-superuser:
 	$(MANAGE_PROD) createsuperuser
+
+prod-webhook-set:
+	$(MANAGE_PROD) set_webhook
+
+prod-webhook-delete:
+	$(MANAGE_PROD) set_webhook --delete
 
 # ================= SSL =================
 

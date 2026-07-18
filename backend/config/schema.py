@@ -22,6 +22,7 @@ class Settings(BaseSettings):
 
     APP_URL: str
     TELEGRAM_BOT_TOKEN: str
+    TELEGRAM_BOT_WEBHOOK_SECRET: str
     HF_TOKEN: str = ""
 
     ADMIN_SITE_HEADER: str = "AIChat Admin"

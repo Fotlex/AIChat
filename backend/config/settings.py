@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "apps.core",
+    "apps.bot",
 ]
 
 MIDDLEWARE = [
@@ -98,6 +99,7 @@ YOOKASSA_SHOP_ID = conf.YOOKASSA_SHOP_ID
 YOOKASSA_SECRET_KEY = conf.YOOKASSA_SECRET_KEY
 
 TELEGRAM_BOT_TOKEN = conf.TELEGRAM_BOT_TOKEN
+TELEGRAM_BOT_WEBHOOK_SECRET = conf.TELEGRAM_BOT_WEBHOOK_SECRET
 
 APP_URL = conf.APP_URL
 HF_TOKEN = conf.HF_TOKEN
@@ -109,7 +111,6 @@ ADMIN_REORDER = [
     {"label": "👥 Пользователи", "models": ["core.User"]},
     {"label": "🎭 Персонажи", "models": ["core.Character"]},
     {"label": "💬 Чаты и Сообщения", "models": ["core.Conversation", "core.Message"]},
-    {"label": "🔋 Кнопки в боте", "models": ["core.MainButton", "core.OtherButton"]},
     {"label": "⚙️ Настройки LLM", "models": ["core.LLMConfiguration"]},
     {
         "label": "💳 Платежи и Промокоды",
@@ -120,4 +121,5 @@ ADMIN_REORDER = [
             "core.Referral",
         ],
     },
+    {"label": "🤖 Управление Ботом", "models": ["bot.BotSettings"]},
 ]

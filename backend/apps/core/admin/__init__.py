@@ -4,9 +4,7 @@ from ..models import (
     Character,
     Conversation,
     LLMConfiguration,
-    MainButton,
     Message,
-    OtherButton,
     Promocode,
     PromocodeUsage,
     Referral,
@@ -14,7 +12,6 @@ from ..models import (
     Transaction,
     User,
 )
-from .button import MainButtonAdmin, OtherButtonAdmin
 from .character import CharacterAdmin
 from .chat import ConversationAdmin, MessageAdmin
 from .llm import LLMConfigurationAdmin
@@ -33,5 +30,3 @@ admin.site.register(Tariff, TariffAdmin)
 admin.site.register(Transaction, TransactionAdmin)
 admin.site.register(Promocode, PromocodeAdmin)
 admin.site.register(PromocodeUsage, PromocodeUsageAdmin)
-admin.site.register(MainButton, MainButtonAdmin)
-admin.site.register(OtherButton, OtherButtonAdmin)
