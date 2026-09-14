@@ -12,8 +12,8 @@ MANAGE_DEV = $(DC_DEV) exec backend python manage.py
 MANAGE_PROD = $(DC_PROD) exec backend python manage.py
 
 .PHONY: dev-build dev-up dev-down dev-stop dev-restart dev-logs dev-shell \
-        dev-startapp dev-makemigrations dev-migrate dev-superuser dev-static \
-		dev-test-backend dev-test-frontend dev-test-all
+        dev-startapp dev-makemigrations dev-migrate dev-webhook-set dev-webhook-delete \
+		dev-superuser dev-static dev-test-backend dev-test-frontend dev-test-all
 
 # ================= DEV =================
 
@@ -47,8 +47,11 @@ dev-makemigrations:
 dev-migrate:
 	$(MANAGE_DEV) migrate
 
-dev-webhook:
+dev-webhook-set:
 	$(MANAGE_DEV) set_webhook
+
+dev-webhook-delete:
+	$(MANAGE_DEV) set_webhook --delete
 
 dev-superuser:
 	$(MANAGE_DEV) createsuperuser
@@ -86,6 +89,12 @@ prod-static:
 prod-superuser:
 	$(MANAGE_PROD) createsuperuser
 
+prod-webhook-set:
+	$(MANAGE_PROD) set_webhook
+
+prod-webhook-delete:
+	$(MANAGE_PROD) set_webhook --delete
+
 # ================= SSL =================
 
 SSL_DIR = $(shell pwd)/ssl
@@ -121,3 +130,31 @@ prod-renew-ssl:
 		certbot/certbot renew --standalone
 	docker start aichat-nginx
 	@echo "Готово!"
+
+# ================= TG-SDK =================
+
+SDK_URL = https://telegram.org/js/telegram-web-app.js
+SDK_PATH = frontend/public/telegram-web-app.js
+EMPTY_HASH = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+check-tg-sdk:
+	@REMOTE_HASH=$$(curl -sSf --connect-timeout 3 --max-time 7 $(SDK_URL) | shasum -a 256 | awk '{ print $$1 }'); \
+	if [ -z "$$REMOTE_HASH" ] || [ "$$REMOTE_HASH" = "$(EMPTY_HASH)" ]; then \
+		echo ">>> [ERROR] Connection to Telegram failed (Blocked or Timeout)."; \
+		exit 1; \
+	fi; \
+	LOCAL_HASH=$$(shasum -a 256 -b $(SDK_PATH) 2>/dev/null | awk '{ print $$1 }'); \
+	if [ "$$REMOTE_HASH" = "$$LOCAL_HASH" ]; then \
+		echo ">>> [OK] Telegram SDK is up to date."; \
+	else \
+		echo ">>> [WARNING] Telegram SDK has changed on the server!"; \
+		echo ">>> Remote: $$REMOTE_HASH"; \
+		echo ">>> Local:  $$LOCAL_HASH"; \
+		echo ">>> Run 'make update-tg-sdk' to sync."; \
+		exit 1; \
+	fi
+
+update-tg-sdk:
+	@mkdir -p frontend/public
+	@curl -sSf --connect-timeout 5 --max-time 15 -o $(SDK_PATH) $(SDK_URL) || (echo ">>> [ERROR] Download failed."; exit 1)
+	@echo ">>> [SUCCESS] Telegram SDK updated at $(SDK_PATH)"

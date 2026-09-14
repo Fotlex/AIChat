@@ -16,12 +16,13 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str
     POSTGRES_PORT: int
     POSTGRES_DB: str
-    
+
     YOOKASSA_SHOP_ID: str
     YOOKASSA_SECRET_KEY: str
-    
+
     APP_URL: str
     TELEGRAM_BOT_TOKEN: str
+    TELEGRAM_BOT_WEBHOOK_SECRET: str
     HF_TOKEN: str = ""
 
     ADMIN_SITE_HEADER: str = "AIChat Admin"

@@ -1,6 +1,6 @@
 import orjson
-from config.utils import R400, R404, fast_json
-from django.db.models import F
+from config.utils import R204, R400, R404, fast_json
+from django.db.models import F, Q
 from django.utils import timezone
 
 from apps.core.decorators import jwt_auth
@@ -9,20 +9,51 @@ from apps.core.models import (
     LLMConfiguration,
     Promocode,
     PromocodeUsage,
+    Referral,
     User,
 )
+
+DAILY_BONUS_REWARD = 100
 
 
 @jwt_auth(methods=["GET"])
 async def current_user_view(request):
     user = (
         await User.objects.filter(id=request.user_id)
-        .values("id", "username", "balance")
+        .values("id", "username", "balance", "last_daily_bonus_at")
         .afirst()
     )
     if not user:
         return fast_json({"error": "User not found"}, status=404)
-    return fast_json(user)
+
+    today = timezone.now().date()
+    can_claim = (
+        user["last_daily_bonus_at"] is None or user["last_daily_bonus_at"] < today
+    )
+    return fast_json(
+        {
+            "id": user["id"],
+            "username": user["username"],
+            "balance": user["balance"],
+            "can_claim_daily_bonus": can_claim,
+        }
+    )
+
+
+@jwt_auth(methods=["POST"])
+async def claim_daily_bonus_view(request):
+    today = timezone.now().date()
+
+    updated_rows = (
+        await User.objects.filter(id=request.user_id)
+        .filter(Q(last_daily_bonus_at__lt=today) | Q(last_daily_bonus_at__isnull=True))
+        .aupdate(balance=F("balance") + DAILY_BONUS_REWARD, last_daily_bonus_at=today)
+    )
+
+    if updated_rows == 0:
+        return R400
+
+    return R204
 
 
 @jwt_auth(methods=["GET"])
@@ -32,6 +63,11 @@ async def settings_info_view(request):
         .values("username", "balance", "preferred_llm_id")
         .afirst()
     )
+
+    referrals_count = await Referral.objects.filter(
+        referrer_id=request.user_id
+    ).acount()
+    user_data["referrals_count"] = referrals_count
 
     my_characters = [
         {

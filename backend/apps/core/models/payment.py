@@ -1,5 +1,7 @@
 from django.db import models
+
 from .base import TimeStampedMixin, UUIDMixin
+
 
 class Transaction(UUIDMixin, TimeStampedMixin):
     class StatusChoices(models.TextChoices):
@@ -13,12 +15,15 @@ class Transaction(UUIDMixin, TimeStampedMixin):
     tariff = models.ForeignKey(
         "Tariff", on_delete=models.SET_NULL, null=True, blank=True
     )
-    
+
     amount = models.DecimalField("Сумма к оплате", max_digits=10, decimal_places=2)
     reward = models.PositiveIntegerField("Монет к начислению")
-    
+
     status = models.CharField(
-        "Статус", max_length=16, choices=StatusChoices.choices, default=StatusChoices.PENDING
+        "Статус",
+        max_length=16,
+        choices=StatusChoices.choices,
+        default=StatusChoices.PENDING,
     )
     provider_payment_id = models.CharField(
         "ID платежа YooKassa", max_length=255, blank=True, db_index=True

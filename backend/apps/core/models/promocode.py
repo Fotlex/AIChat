@@ -1,5 +1,7 @@
 from django.db import models
+
 from .base import TimeStampedMixin
+
 
 class Promocode(TimeStampedMixin):
     code = models.CharField("Промокод", max_length=32, unique=True)
@@ -13,6 +15,7 @@ class Promocode(TimeStampedMixin):
         db_table = "promocodes"
         verbose_name = "Промокод"
         verbose_name_plural = "Промокоды"
+
 
 class PromocodeUsage(TimeStampedMixin):
     user = models.ForeignKey("User", on_delete=models.CASCADE)

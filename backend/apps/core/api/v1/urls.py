@@ -11,6 +11,7 @@ from .chat import chat_list_view, chat_messages_view, message_send_view
 from .payment import create_payment_view, tariff_list_view, yookassa_webhook_view
 from .user import (
     current_user_view,
+    claim_daily_bonus_view,
     redeem_promocode_view,
     settings_info_view,
     update_llm_view,
@@ -26,6 +27,7 @@ auth_patterns = [
 urlpatterns = [
     path("auth/", include(auth_patterns)),
     path("users/me/", current_user_view),
+    path("users/daily-bonus/claim/", claim_daily_bonus_view),
     path("users/<int:user_id>/profile/", user_profile_view),
     path("users/settings/info/", settings_info_view),
     path("users/settings/update-llm/", update_llm_view),

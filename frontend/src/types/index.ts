@@ -20,6 +20,8 @@ export interface User {
   username: string | null;
   balance: number;
   preferred_llm_id?: number | null;
+  referrals_count?: number;
+  can_claim_daily_bonus?: boolean;
 }
 
 export interface Tariff {

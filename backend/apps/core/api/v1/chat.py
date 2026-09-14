@@ -77,7 +77,7 @@ async def chat_messages_view(request, chat_id):
     cursor = int(cursor_raw) if cursor_raw and cursor_raw.isdigit() else 0
     limit = 30
 
-    filters = {"conversation_id": chat_id}
+    filters = {"conversation_id": chat_id, "conversation__user_id": request.user_id}
     if cursor > 0:
         filters["id__lt"] = cursor
 
@@ -124,7 +124,6 @@ async def message_send_view(request, character_id):
     if not llm:
         return fast_json({"error": "Нет доступных моделей"}, status=400)
 
-    # ПРОВЕРКА БАЛАНСА
     if user.balance < llm.cost_per_request:
         return fast_json({"error": "Недостаточно кристаллов 💎"}, status=402)
 
@@ -152,7 +151,6 @@ async def message_send_view(request, character_id):
                 )
             )
 
-    # Создаем сообщение пользователя и пустышку для ИИ
     user_msg = Message(
         conversation=conv,
         role=Message.RoleChoices.USER,
@@ -168,14 +166,12 @@ async def message_send_view(request, character_id):
     created_messages.extend([user_msg, ai_msg])
     await Message.objects.abulk_create(created_messages)
 
-    # Собираем контекст (последние 10 сообщений для экономии)
     history = [
         msg
         async for msg in Message.objects.filter(conversation=conv).order_by("-id")[:10]
     ]
     history.reverse()
 
-    # ЖЕСТКИЙ ПРОМПТ
     system_prompt = (
         f"{char.system_prompt}\n\n"
         "ВАЖНОЕ ПРАВИЛО: Ты общаешься строго на РУССКОМ языке. "
@@ -185,15 +181,12 @@ async def message_send_view(request, character_id):
 
     api_messages = [{"role": "system", "content": system_prompt}]
     for h in history:
-        # Пропускаем пустые (наша текущая пустышка)
         if h.content:
             api_messages.append({"role": h.role, "content": h.content})
 
-    # АСИНХРОННЫЙ ГЕНЕРАТОР СТРИМА
     async def event_stream():
         full_text = ""
         try:
-            # Сначала отправляем метаданные фронту
             init_data = {
                 "type": "init",
                 "user_msg": {"id": user_msg.id, "content": user_msg.content},
@@ -203,7 +196,7 @@ async def message_send_view(request, character_id):
             yield f"data: {orjson.dumps(init_data).decode()}\n\n"
 
             stream = await aclient.chat.completions.create(
-                model=llm.provider_code,  # В админке укажите "Qwen/Qwen2.5-7B-Instruct:fastest" и тд
+                model=llm.provider_code,
                 messages=api_messages,
                 stream=True,
                 max_tokens=800,
@@ -216,7 +209,6 @@ async def message_send_view(request, character_id):
                     full_text += text_chunk
                     yield f"data: {orjson.dumps({'type': 'chunk', 'text': text_chunk}).decode()}\n\n"
 
-            # УСПЕШНОЕ ЗАВЕРШЕНИЕ: Обновляем БД и списываем баланс
             if full_text:
                 await Message.objects.filter(id=ai_msg.id).aupdate(content=full_text)
                 await Conversation.objects.filter(id=conv.id).aupdate(

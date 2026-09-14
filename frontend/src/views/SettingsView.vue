@@ -1,15 +1,26 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useUserStore } from "@/store/user";
+import { useTelegram } from "@/composables/useTelegram";
 import { updatePreferredLLm, redeemPromocode } from "@/api/userApi";
 import router from "@/router";
 
 const userStore = useUserStore();
+const { openLink } = useTelegram();
+
 const isModelsExpanded = ref(false);
 const promoCode = ref("");
 const promoStatus = ref({ text: "", isError: false });
+const copyStatus = ref("Скопировать");
 
 const isLoading = computed(() => !userStore.isSettingsLoaded);
+
+const botBaseLink = import.meta.env.VITE_TELEGRAM_BOT_LINK;
+
+const referralLink = computed(() => {
+  const userId = userStore.currentUser?.id;
+  return userId ? `${botBaseLink}?startapp=ref_${userId}` : "";
+});
 
 const selectedModel = computed(() => {
   return (
@@ -18,6 +29,30 @@ const selectedModel = computed(() => {
     ) || null
   );
 });
+
+const copyToClipboard = async () => {
+  if (!referralLink.value) return;
+
+  try {
+    await navigator.clipboard.writeText(referralLink.value);
+    copyStatus.value = "Скопировано✅";
+    setTimeout(() => {
+      copyStatus.value = "Скопировать";
+    }, 2000);
+  } catch (err) {
+    copyStatus.value = "Ошибка ❌";
+  }
+};
+
+const shareReferralLink = () => {
+  if (!referralLink.value) return;
+
+  const baseUrl = "https://t.me/share/url";
+  const urlParam = `url=${encodeURIComponent(referralLink.value)}`;
+  const textParam = `text=${encodeURIComponent("Присоединяйся к AIChat по моей ссылке! 💎")}`;
+
+  openLink(`${baseUrl}?${urlParam}&${textParam}`);
+};
 
 onMounted(() => {
   userStore.loadSettingsInfo();
@@ -86,6 +121,38 @@ const logout = () => {
             </div>
             <div class="open-profile-btn">Открыть профиль →</div>
           </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="group-title">Реферальная программа</div>
+        <div class="referral-card">
+          <div class="ref-stats">
+            <span class="ref-label">Приглашено друзей:</span>
+            <span class="ref-count">{{
+              userStore.currentUser?.referrals_count ?? 0
+            }}</span>
+          </div>
+          <div class="ref-action-zone">
+            <input
+              type="text"
+              readonly
+              :value="referralLink"
+              class="ref-link-input"
+              @click="(e) => (e.target as HTMLInputElement).select()"
+            />
+            <div class="ref-buttons">
+              <button class="btn-action copy" @click="copyToClipboard">
+                {{ copyStatus }}
+              </button>
+              <button class="btn-action share" @click="shareReferralLink">
+                Поделиться
+              </button>
+            </div>
+          </div>
+          <p class="ref-hint">
+            За каждого приглашенного друга вы получаете 100 💎
+          </p>
         </div>
       </div>
 
@@ -196,6 +263,8 @@ const logout = () => {
   border: 1px solid rgba(255, 255, 255, 0.05);
   cursor: pointer;
   transition: transform 0.1s;
+  width: 100%;
+  overflow: hidden;
 }
 .profile-card:active {
   transform: scale(0.98);
@@ -217,16 +286,23 @@ const logout = () => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1;
+  min-width: 0;
 }
 .user-header {
   display: flex;
   align-items: center;
   gap: 12px;
+  justify-content: space-between;
+  width: 100%;
 }
 .username {
   font-size: 18px;
   font-weight: 700;
   color: #fff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .balance-tag {
   color: #81b2ff;
@@ -235,6 +311,8 @@ const logout = () => {
   background: rgba(129, 178, 255, 0.1);
   padding: 2px 8px;
   border-radius: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .open-profile-btn {
   font-size: 12px;
@@ -251,6 +329,90 @@ const logout = () => {
 .profile-card:hover .open-profile-btn {
   background: rgba(255, 255, 255, 0.25);
 }
+
+.referral-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.ref-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ref-label {
+  font-size: 15px;
+  color: #fff;
+  font-weight: 500;
+}
+.ref-count {
+  font-size: 18px;
+  font-weight: 800;
+  color: #34c759;
+  background: rgba(52, 199, 89, 0.1);
+  padding: 4px 12px;
+  border-radius: 10px;
+}
+.ref-action-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ref-link-input {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  outline: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+}
+.ref-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.btn-action {
+  color: #fff;
+  border: none;
+  padding: 14px;
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    transform 0.1s;
+}
+.btn-action:active {
+  transform: scale(0.98);
+}
+.btn-action.copy {
+  background: rgba(255, 255, 255, 0.1);
+}
+.btn-action.copy:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.btn-action.share {
+  background: #007aff;
+}
+.btn-action.share:hover {
+  background: #0069d9;
+}
+.ref-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  text-align: center;
+}
+
 .accordion {
   background: rgba(255, 255, 255, 0.06);
   border-radius: 20px;
